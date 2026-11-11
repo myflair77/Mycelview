@@ -1,0 +1,177 @@
+﻿<Window x:Class="PinShelf.MainWindow" Icon="Assets/PinShelf.ico" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:PinShelf"
+ PreviewMouseDown="SearchOutsideClick" Title="PinShelf — Your Files, Your Workspace." Width="1500" Height="900" MinWidth="1120" MinHeight="600" Background="{DynamicResource CanvasBrush}" FontFamily="{DynamicResource UiFont}" FontSize="{DynamicResource FontSize11}" Foreground="{DynamicResource TextBrush}">
+ <Grid x:Name="WindowLayers"><DockPanel>
+  <Border DockPanel.Dock="Top" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="18,8">
+   <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+ <Border Width="32" Height="32" Margin="0,0,12,0" VerticalAlignment="Center">
+  <Viewbox Width="32" Height="32" Stretch="Fill"><Canvas Width="720" Height="560">
+   <Path Data="{StaticResource LogoBack}" Fill="{DynamicResource AccentBrush}"/>
+   <Path Data="{StaticResource LogoFront}" Fill="{DynamicResource AccentBrush}"/>
+   <Path Data="{StaticResource LogoDocument}" Fill="White"/>
+  </Canvas></Viewbox>
+ </Border>
+ <TextBlock VerticalAlignment="Center" Text="PinShelf" FontSize="{DynamicResource FontSize26}" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+ <StackPanel VerticalAlignment="Center" Margin="18,0,0,0"><TextBlock Text="Your Files, Your Workspace." FontSize="{DynamicResource FontSize11}" FontWeight="SemiBold" Margin="0,2,0,0"/>
+ <TextBlock Text="내 파일과 폴더를 한눈에, 한곳에서." Foreground="{DynamicResource MutedBrush}" FontSize="{DynamicResource FontSize10}" Margin="0,3,0,0"/></StackPanel>
+</StackPanel>
+    <StackPanel Grid.Column="1" Orientation="Horizontal"><StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0"><Button Content="−" Click="ReduceText" IsEnabled="{Binding CanReduceText}" ToolTip="글자 1% 축소" Padding="6,2"/><Button Content="{Binding TextScaleLabel}" Click="ResetText" ToolTip="글자 크기 · 클릭하면 100%" Padding="5,2"/><Button Content="+" Click="EnlargeText" IsEnabled="{Binding CanEnlargeText}" ToolTip="글자 1% 확대" Padding="6,2"/></StackPanel><Button Content="{Binding EnlargementLabel}" Click="ShowEnlargementSettings" ToolTip="카드 상단에 마우스를 올렸을 때의 확대 방식과 크기" Margin="0,0,8,0"/><TextBlock Text="디자인" VerticalAlignment="Center" Margin="0,0,8,0"/><ComboBox x:Name="SkinPicker" ItemsSource="{Binding Skins}" DisplayMemberPath="Name" SelectedValuePath="Id" SelectedValue="{Binding SelectedSkinId, Mode=TwoWay}" MinWidth="170" VerticalAlignment="Center" Margin="0,0,12,0" AutomationProperties.Name="디자인 스킨 선택"/><Button Content="↶" ToolTip="{Binding FileTasks.UndoLabel}" IsEnabled="{Binding FileTasks.CanUndo}" Click="UndoFileAction"/><Button Content="↷" ToolTip="다시 실행 (Ctrl+Y)" IsEnabled="{Binding FileTasks.CanRedo}" Click="RedoFileAction"/><Button Content="설정 백업 ▾" Click="SettingsMenu"><Button.ContextMenu><ContextMenu><MenuItem Header="실행 취소 기록 관리…" Click="UndoHistorySettings"/><Separator/><MenuItem Header="설정 내보내기…" Click="ExportSettings"/><MenuItem Header="설정 가져오기…" Click="ImportSettings"/><Separator/><MenuItem Header="자동 백업에서 복원…" Tag="backup" Click="ImportSettings"/></ContextMenu></Button.ContextMenu></Button></StackPanel>
+   </Grid>
+  </Border>
+  <Border x:Name="SearchArea" DockPanel.Dock="Top" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="18,8">
+   <StackPanel>
+    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <TextBlock Text="PC 통합 검색" VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold"/>
+     <Grid Grid.Column="1"><TextBox x:Name="SearchBox" Text="{Binding Search.Query, UpdateSourceTrigger=PropertyChanged}" Padding="8,7,36,7" KeyDown="SearchKeyDown" PreviewMouseDown="SearchBoxClicked" ToolTip="입력하면 바로 검색합니다. ㄱ·ㄱㅅ 같은 초성도 지원합니다." AutomationProperties.Name="PC 파일 폴더 검색"/>
+      <Button Content="×" Command="{Binding Search.Clear}" HorizontalAlignment="Right" VerticalAlignment="Center" Width="27" Margin="0,0,4,0" Padding="0" Background="Transparent" BorderThickness="0" FontSize="{DynamicResource FontSize18}" ToolTip="검색어 지우기" AutomationProperties.Name="검색어 지우기"/>
+     </Grid>
+    </Grid>
+    <Grid Margin="88,5,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button Grid.Column="3" Content="인덱스 관리" Click="OpenIndexManagement" FontSize="{DynamicResource FontSize10}" Padding="6,1" Margin="8,0,0,0"/>
+     <TextBlock Text="OR: 둘 중 하나 · &amp;: 모두 포함 · !: 제외" FontSize="{DynamicResource FontSize10}" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" ToolTip="예산 OR 결산: 둘 중 하나 포함 / 예산 &amp; 2027: 둘 다 포함 / 예산 !초안: 초안 제외. 공백도 &amp;와 같습니다. 괄호로 조건을 묶고, 따옴표로 연속된 문구를 찾을 수 있습니다."/>
+     <Border Grid.Column="1" Width="1" Height="12" Background="{DynamicResource BorderBrush}" Margin="12,0"/>
+     <DockPanel Grid.Column="2"><ProgressBar Width="40" Height="3" IsIndeterminate="True" Visibility="{Binding Index.Busy, Converter={StaticResource BoolVisibility}}" Margin="0,0,8,0"/><TextBlock Text="{Binding Index.Status}" FontSize="{DynamicResource FontSize10}" Foreground="{DynamicResource MutedBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Index.Status}" VerticalAlignment="Center"/></DockPanel>
+    </Grid>    <Popup x:Name="SearchPopup" PlacementTarget="{Binding ElementName=SearchBox}" Placement="Bottom" VerticalOffset="4" StaysOpen="True" AllowsTransparency="True" IsOpen="{Binding Search.Visible}"><Border x:Name="SearchResultsPanel" Width="{Binding ActualWidth, ElementName=SearchBox}" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="10"><Grid x:Name="SearchResultsLayout" Height="300">
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <DockPanel><StackPanel DockPanel.Dock="Right" Orientation="Horizontal"><StackPanel.Resources><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="FontSize" Value="{DynamicResource FontSize10}"/><Setter Property="Padding" Value="6,2"/><Setter Property="Margin" Value="2,0"/></Style></StackPanel.Resources><Button x:Name="RegisterSearchButton" Content="선택 결과 등록 →" Click="RegisterSearchSelection"/><Button Content="원본 위치 열기" Click="SearchLocation"/><Button Content="결과 더 보기" Command="{Binding Search.LoadMore}" Visibility="{Binding Search.More, Converter={StaticResource BoolVisibility}}"/><Button Content="결과 닫기" Command="{Binding Search.Close}"/></StackPanel><TextBlock FontSize="{DynamicResource FontSize10}" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Search.Scope}"><Run Text="{Binding Search.Status, Mode=OneWay}"/><Run Text="  |  "/><Run Text="{Binding Search.Scope, Mode=OneWay}"/></TextBlock></DockPanel>
+     <DataGrid x:Name="SearchResults" Sorting="SortSearchResults" Grid.Row="2" ItemsSource="{Binding Search.Results}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" SelectionMode="Extended" SelectionUnit="FullRow" HeadersVisibility="Column" GridLinesVisibility="None" Background="{DynamicResource SurfaceBrush}" BorderThickness="0" RowHeight="{DynamicResource FileRowHeight}" EnableRowVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" MouseDoubleClick="SearchOpen" KeyDown="SearchResultKeyDown" PreviewMouseLeftButtonDown="SearchMouseDown" PreviewMouseMove="SearchMouseMove">
+      <DataGrid.Columns>
+       <DataGridTemplateColumn Header="이름" SortMemberPath="Name" Width="230"><DataGridTemplateColumn.CellTemplate><DataTemplate><DockPanel><Image Source="{Binding IconImage}" Width="16" Height="16" Margin="4,0,6,0"/><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" ToolTip="{Binding FullPath}"/></DockPanel></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>
+       <DataGridTextColumn Header="경로" Binding="{Binding FullPath}" Width="*"><DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextTrimming" Value="CharacterEllipsis"/><Setter Property="ToolTip" Value="{Binding FullPath}"/></Style></DataGridTextColumn.ElementStyle></DataGridTextColumn>
+       <DataGridTextColumn Header="수정한 날짜" Binding="{Binding Modified, StringFormat=yy.MM.dd HH:mm}" Width="120"/>
+       <DataGridTextColumn Header="크기" Binding="{Binding Size}" SortMemberPath="Length" Width="85"><DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextAlignment" Value="Right"/><Setter Property="Margin" Value="0,0,8,0"/></Style></DataGridTextColumn.ElementStyle></DataGridTextColumn>
+       <DataGridTextColumn Header="유형" Binding="{Binding Type}" Width="120"/>
+      </DataGrid.Columns>
+     </DataGrid>
+     <Expander Grid.Row="3" Header="접근 실패·제외 경로 (최대 200개)" FontSize="{DynamicResource FontSize10}" Foreground="{DynamicResource MutedBrush}"><ListBox ItemsSource="{Binding Search.Issues}" MaxHeight="65" FontSize="{DynamicResource FontSize10}"/></Expander>
+    </Grid></Border></Popup>
+   </StackPanel>
+  </Border>
+  <Border DockPanel.Dock="Bottom" Background="{DynamicResource SurfaceBrush}" Padding="14,6"><StackPanel>
+   <DockPanel Visibility="{Binding FileTasks.HasActivity, Converter={StaticResource BoolVisibility}}" Margin="0,0,0,4">
+    <Button DockPanel.Dock="Right" Content="작업 취소" Command="{Binding FileTasks.Cancel}" Visibility="{Binding FileTasks.Busy, Converter={StaticResource BoolVisibility}}" Padding="8,2"/>
+    <Button DockPanel.Dock="Right" Content="닫기" Command="{Binding FileTasks.Dismiss}" Padding="8,2"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Style.Triggers><DataTrigger Binding="{Binding FileTasks.Busy}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></Button.Style></Button>
+    <ProgressBar DockPanel.Dock="Left" Width="100" Height="5" Value="{Binding FileTasks.Percent, Mode=OneWay}" Visibility="{Binding FileTasks.Busy, Converter={StaticResource BoolVisibility}}" Margin="0,0,10,0"/>
+    <TextBlock Text="{Binding FileTasks.Status}" TextTrimming="CharacterEllipsis" ToolTip="{Binding FileTasks.Status}" VerticalAlignment="Center"/>
+   </DockPanel>
+   <TextBlock Text="{Binding Status}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Status}"/>
+  </StackPanel></Border>
+  <Grid x:Name="PaneGrid" Background="Transparent" PreviewMouseWheel="WorkspaceMouseWheel" IsEnabled="{Binding WorkspaceReady}">
+   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+   <Grid.ColumnDefinitions><ColumnDefinition x:Name="ExplorerColumn" Width="280" MinWidth="210" MaxWidth="480"/><ColumnDefinition Width="5"/><ColumnDefinition Width="*" MinWidth="580"/><ColumnDefinition Width="5"/><ColumnDefinition x:Name="FavoritesColumn" Width="265" MinWidth="220" MaxWidth="500"/></Grid.ColumnDefinitions>
+  <Border Grid.Column="2" Grid.ColumnSpan="3" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0" Padding="0,4,0,0" IsEnabled="{Binding WorkspaceReady}">
+   <Grid>
+    <ScrollViewer x:Name="WorkspaceTabScroll" Margin="15,0,12,0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+     <StackPanel Orientation="Horizontal">
+     <ItemsControl x:Name="WorkspaceTabs" ItemsSource="{Binding Workspaces}">
+      <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+      <ItemsControl.ItemTemplate><DataTemplate>
+       <Border Tag="WorkspaceTab" Margin="0,0,6,0" Padding="3,1,3,2" CornerRadius="6,6,0,0" AllowDrop="True" DragOver="WorkspaceTabDragOver" Drop="WorkspaceTabDrop">
+        <Border.Style><Style TargetType="Border"><Setter Property="BorderThickness" Value="1,1,1,0"/><Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/><Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/><Style.Triggers><DataTrigger Binding="{Binding IsActive}" Value="True"><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/><Setter Property="Background" Value="{DynamicResource CanvasBrush}"/></DataTrigger></Style.Triggers></Style></Border.Style>
+        <Border.ContextMenu><ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"><MenuItem Header="이름 변경…" Click="RenameWorkspace"/><MenuItem Header="작업공간 복제" Click="DuplicateWorkspace"/><Separator/><MenuItem Header="작업공간 삭제…" Click="DeleteWorkspace"/></ContextMenu></Border.ContextMenu>
+        <StackPanel Orientation="Horizontal">
+         <TextBlock Text="⠿" Padding="4,0" VerticalAlignment="Center" Cursor="SizeAll" ToolTip="드래그하여 탭 순서 변경" PreviewMouseLeftButtonDown="WorkspaceTabDragStart" PreviewMouseMove="WorkspaceTabDragMove"/>
+         <Button Content="{Binding Name}" Click="SelectWorkspace" Padding="8,2" BorderThickness="0" Background="Transparent" ToolTip="{Binding Name}"><Button.Style><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Style.Triggers><DataTrigger Binding="{Binding IsActive}" Value="True"><Setter Property="FontWeight" Value="Bold"/><Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/></DataTrigger></Style.Triggers></Style></Button.Style></Button>
+         <Button Content="⋯" Click="WorkspaceTabMenu" ToolTip="작업공간 메뉴" Padding="4,2" BorderThickness="0" Background="Transparent"/>
+        </StackPanel>
+       </Border>
+      </DataTemplate></ItemsControl.ItemTemplate>
+     </ItemsControl>
+     <Button x:Name="AddWorkspaceButton" Content="＋" Click="AddWorkspace" Width="32" MinHeight="24" Padding="0" Margin="0,0,4,0" VerticalAlignment="Center" ToolTip="새 업무 탭 추가 · 탭마다 폴더·즐겨찾기·메모를 따로 저장합니다" AutomationProperties.Name="새 업무 탭 추가"/>
+     <TextBlock x:Name="WorkspaceHint" Text="＋를 눌러 작업공간을 추가하세요" FontSize="{DynamicResource FontSize10}" Foreground="{DynamicResource MutedBrush}" Opacity="0.7" VerticalAlignment="Center" Margin="8,0,8,0" IsHitTestVisible="False"/>
+     </StackPanel>
+    </ScrollViewer>
+   </Grid>
+  </Border>
+   <Border x:Name="ExplorerPane" Grid.RowSpan="2" Background="{DynamicResource SurfaceBrush}" Padding="12">
+    <Grid>
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition x:Name="ExplorerTreeRow" Height="160" MinHeight="60"/><RowDefinition Height="5"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <DockPanel Margin="0,0,0,8"><TextBlock Text="통합 파일 탐색기" FontSize="{DynamicResource FontSize13}" FontWeight="{DynamicResource HeadingWeight}" VerticalAlignment="Center"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><StackPanel.Resources><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Foreground" Value="#595959"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="2.5,0"/><Setter Property="Width" Value="20"/><Setter Property="Height" Value="22"/></Style></StackPanel.Resources><Button x:Name="CollapseExplorerButton" Click="ToggleExplorer" ToolTip="통합 파일 탐색기 접기" AutomationProperties.Name="통합 파일 탐색기 접기" Background="{DynamicResource SelectionBrush}" BorderThickness="0" Width="25" Margin="5,0,0,0"><Path Width="16" Height="14" Stretch="Uniform" Stroke="#595959" StrokeThickness="1.3" StrokeLineJoin="Round" Data="M1,1 L17,1 17,15 1,15 Z M6,1 L6,15 M13,5 L10,8 13,11"/></Button></StackPanel></DockPanel>
+     <TextBox x:Name="ExplorerAddress" Grid.Row="1" Text="{Binding Explorer.Address, UpdateSourceTrigger=PropertyChanged}" KeyDown="AddressKeyDown" ToolTip="폴더 경로를 입력한 뒤 Enter" FontSize="{DynamicResource FontSize10}" Margin="0,0,0,8"/>
+     <TreeView x:Name="FolderTree" Grid.Row="2" ItemsSource="{Binding Explorer.Roots}" SelectedItemChanged="TreeSelected" TreeViewItem.Expanded="TreeExpanded" PreviewMouseLeftButtonDown="TreeMouseDown" PreviewMouseMove="TreeMouseMove" BorderThickness="0" Background="{DynamicResource SurfaceBrush}">
+      <TreeView.ItemTemplate><HierarchicalDataTemplate DataType="{x:Type local:FolderNode}" ItemsSource="{Binding Children}"><TextBlock Text="{Binding Title}" ToolTip="{Binding Path}" Foreground="{DynamicResource TextBrush}"/></HierarchicalDataTemplate></TreeView.ItemTemplate>
+     </TreeView>
+     <GridSplitter Grid.Row="3" Height="5" HorizontalAlignment="Stretch" Background="{DynamicResource BorderBrush}"/>
+     <Grid Grid.Row="4" Margin="0,8,0,5"><TextBlock Text="폴더 내용" FontWeight="{DynamicResource HeadingWeight}" VerticalAlignment="Center"/><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><StackPanel.Resources><Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}"><Setter Property="Foreground" Value="#595959"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="2.5,0"/><Setter Property="Width" Value="20"/><Setter Property="Height" Value="22"/></Style></StackPanel.Resources><Button Click="ExplorerBack" IsEnabled="{Binding Explorer.CanBack}" ToolTip="뒤로" AutomationProperties.Name="뒤로"><Path Width="14" Height="14" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.25" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M15,8 L1,8 M7,2 L1,8 L7,14"><Path.LayoutTransform><ScaleTransform ScaleX="0.8" ScaleY="0.8"/></Path.LayoutTransform></Path></Button><Button Click="ExplorerForward" IsEnabled="{Binding Explorer.CanForward}" ToolTip="앞으로" AutomationProperties.Name="앞으로"><Path Width="14" Height="14" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.25" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M1,8 L15,8 M9,2 L15,8 L9,14"><Path.LayoutTransform><ScaleTransform ScaleX="0.8" ScaleY="0.8"/></Path.LayoutTransform></Path></Button><Button Click="ExplorerUp" ToolTip="상위 폴더" AutomationProperties.Name="상위 폴더"><Path Width="14" Height="14" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.875" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M8,15 L8,1 M2,7 L8,1 L14,7"><Path.LayoutTransform><ScaleTransform ScaleX="0.8" ScaleY="0.8"/></Path.LayoutTransform></Path></Button><Button Click="ExplorerRefresh" ToolTip="새로고침" AutomationProperties.Name="새로고침"><Path Width="14" Height="14" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.25" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Data="M14,5 A6.5,6.5 0 1 0 14,11 M14,1 L14,6 L9,6"><Path.LayoutTransform><ScaleTransform ScaleX="0.8" ScaleY="0.8"/></Path.LayoutTransform></Path></Button></StackPanel></Grid>
+     <DataGrid x:Name="ExplorerList" Grid.Row="5" ItemsSource="{Binding Explorer.Entries}" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" SelectionMode="Extended" SelectionUnit="FullRow" HeadersVisibility="Column" GridLinesVisibility="None" BorderThickness="0" Background="{DynamicResource SurfaceBrush}" FontSize="{DynamicResource FontSize11}" RowHeight="{DynamicResource FileRowHeight}" EnableRowVirtualization="True" VirtualizingPanel.VirtualizationMode="Recycling" MouseDoubleClick="ExplorerOpen" KeyDown="ExplorerKeyDown" PreviewMouseLeftButtonDown="ExplorerMouseDown" PreviewMouseMove="ExplorerMouseMove">
+      <DataGrid.Columns><DataGridTemplateColumn Header="" Width="26"><DataGridTemplateColumn.CellTemplate><DataTemplate><Image Source="{Binding IconImage}" Width="16" Height="16" RenderOptions.BitmapScalingMode="HighQuality"/></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn><DataGridTextColumn Header="이름" Binding="{Binding Name}" Width="*"><DataGridTextColumn.ElementStyle><Style TargetType="TextBlock"><Setter Property="TextTrimming" Value="CharacterEllipsis"/><Setter Property="ToolTip" Value="{Binding FullPath}"/></Style></DataGridTextColumn.ElementStyle></DataGridTextColumn></DataGrid.Columns>
+     </DataGrid>
+     <Button x:Name="RegisterSelectionButton" HorizontalAlignment="Right" Grid.Row="6" Content="선택 항목 등록 →" Click="RegisterSelection" Background="{DynamicResource AccentBrush}" Foreground="{DynamicResource OnAccentBrush}" Margin="0,8,0,5"/>
+     <TextBlock Grid.Row="7" Text="{Binding Explorer.Status}" Foreground="{DynamicResource MutedBrush}" FontSize="{DynamicResource FontSize10}" TextWrapping="Wrap" MaxHeight="48" ToolTip="{Binding Explorer.Status}"/>
+    </Grid>
+   </Border>
+   <Button x:Name="ExpandExplorerButton" Grid.RowSpan="2" VerticalAlignment="Top" Width="22" Margin="0,12" Padding="3,4" Click="ToggleExplorer" ToolTip="통합 파일 탐색기 펼치기" AutomationProperties.Name="통합 파일 탐색기 펼치기" Background="{DynamicResource SelectionBrush}" BorderThickness="0" Visibility="Collapsed"><Path Width="16" Height="14" Stretch="Uniform" Stroke="#595959" StrokeThickness="1.3" StrokeLineJoin="Round" Data="M1,1 L17,1 17,15 1,15 Z M6,1 L6,15 M10,5 L13,8 10,11"/></Button>
+   <GridSplitter x:Name="ExplorerSplitter" Grid.RowSpan="2" Grid.Column="1" Width="5" HorizontalAlignment="Stretch" Background="{DynamicResource BorderBrush}"/>
+   <Grid x:Name="FolderWorkspaceArea" Grid.Row="1" Grid.Column="2" AllowDrop="True" DragOver="WorkspaceDragOver" Drop="WorkspaceDrop" Background="Transparent" Margin="10,0">
+    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+    <Grid Margin="6,4,6,5"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+     <StackPanel><WrapPanel VerticalAlignment="Center">
+      <TextBlock Text="폴더 즐겨찾기" FontSize="{DynamicResource FontSize14}" FontWeight="{DynamicResource HeadingWeight}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center" ToolTip="모든 폴더 카드 높이 조절 (20 DIP씩)">
+       <Button x:Name="DecreaseHeightButton" Content="−" Command="{Binding DecreaseFolderHeight}" IsEnabled="{Binding CanDecreaseHeight}" Width="25" Padding="0,3" ToolTip="카드 높이 줄이기"/>
+       <TextBlock Text="{Binding FolderHeight, StringFormat={}{0:0}}" VerticalAlignment="Center" TextAlignment="Center" MinWidth="29" Margin="2,0"/>
+       <Button x:Name="IncreaseHeightButton" Content="＋" Command="{Binding IncreaseFolderHeight}" IsEnabled="{Binding CanIncreaseHeight}" Width="25" Padding="0,3" ToolTip="카드 높이 늘리기"/>
+      </StackPanel><Button Content="표시 정보 ▾" Click="ShowColumnsMenu"><Button.ContextMenu><ContextMenu>
+  <MenuItem Header="이름 (항상 표시)" IsCheckable="True" IsChecked="True" IsEnabled="False"/>
+  <MenuItem Header="수정한 날짜" IsCheckable="True" IsChecked="{Binding ShowModified, Mode=TwoWay}" StaysOpenOnClick="True"/>
+  <MenuItem Header="크기" IsCheckable="True" IsChecked="{Binding ShowSize, Mode=TwoWay}" StaysOpenOnClick="True"/>
+  <MenuItem Header="유형" IsCheckable="True" IsChecked="{Binding ShowType, Mode=TwoWay}" StaysOpenOnClick="True"/>
+  <MenuItem Header="만든 날짜" IsCheckable="True" IsChecked="{Binding ShowCreated, Mode=TwoWay}" StaysOpenOnClick="True"/>
+  <MenuItem Header="확장명" IsCheckable="True" IsChecked="{Binding ShowExtension, Mode=TwoWay}" StaysOpenOnClick="True"/>
+ </ContextMenu></Button.ContextMenu></Button> <Button Content="{Binding FolderColumnsLabel}" Click="ShowFolderColumns" Margin="8,0,3,0"/><TextBlock Text="⠿ 핸들로 순서 변경" FontSize="{DynamicResource FontSize10}" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" Margin="5,0,0,0"/></WrapPanel></StackPanel>
+     <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top"><Button Content="{Binding ToggleFoldersLabel}" Command="{Binding ToggleFolders}" ToolTip="누를 때마다 모두 접기와 모두 펼치기를 번갈아 적용"/></StackPanel>
+    </Grid>
+<ScrollViewer x:Name="FolderWorkspaceScroll" Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="0,0,0,12">
+     <ItemsControl x:Name="FolderCards" ItemsSource="{Binding Folders}" HorizontalContentAlignment="Stretch"><ItemsControl.ItemContainerStyle><Style TargetType="ContentPresenter"><Setter Property="Opacity" Value="{Binding DragOpacity}"/></Style></ItemsControl.ItemContainerStyle><ItemsControl.ItemsPanel><ItemsPanelTemplate><local:FolderGridPanel Columns="{Binding FolderColumns}"/></ItemsPanelTemplate></ItemsControl.ItemsPanel><ItemsControl.ItemTemplate><DataTemplate><local:ViewportCardHost Margin="5"/></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+    </ScrollViewer>
+    <TextBlock Grid.Row="2" Text="왼쪽에서 폴더를 선택하고 등록하거나&#10;이 영역에 끌어 놓으세요." TextAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" IsHitTestVisible="False"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Folders.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+   </Grid>
+   <GridSplitter Grid.Row="1" Grid.Column="3" Width="5" HorizontalAlignment="Stretch" Background="{DynamicResource BorderBrush}"/>
+   <Border Grid.Row="1" Grid.Column="4" Background="{DynamicResource CanvasBrush}" Padding="12" AllowDrop="True" DragOver="WorkspaceDragOver" Drop="WorkspaceDrop">
+    <Grid><Grid.RowDefinitions><RowDefinition x:Name="FavoritesRow" Height="*" MinHeight="100"/><RowDefinition Height="5"/><RowDefinition x:Name="RecentRow" Height="*" MinHeight="100"/></Grid.RowDefinitions><Grid Grid.Row="0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+     <WrapPanel Margin="0,0,0,10"><TextBlock Text="파일 즐겨찾기" FontSize="{DynamicResource FontSize14}" FontWeight="{DynamicResource HeadingWeight}" VerticalAlignment="Center"/><Button Content="{Binding FavoriteColumnsLabel}" Click="ShowFileColumns" Padding="5,2" Margin="8,0,0,0"/><TextBlock Text="⠿ 핸들로 순서 변경" FontSize="{DynamicResource FontSize10}" Foreground="{DynamicResource MutedBrush}" VerticalAlignment="Center" Margin="8,0"/></WrapPanel>
+
+     <ListBox ScrollViewer.CanContentScroll="False" x:Name="FavoritesList" Grid.Row="2" ItemsSource="{Binding Favorites}" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" MouseDoubleClick="FavoriteOpen" KeyDown="FavoriteKeyDown">
+      <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="Opacity" Value="{Binding DragOpacity}"/><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0"/></Style></ListBox.ItemContainerStyle>
+      <ListBox.ItemsPanel><ItemsPanelTemplate><local:FolderGridPanel Columns="{Binding FavoriteColumns}"/></ItemsPanelTemplate></ListBox.ItemsPanel><ListBox.ItemTemplate><DataTemplate><Border Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="2,7"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel>
+       <DockPanel><TextBlock Text="⠿" Cursor="SizeAll" Margin="0,0,5,0" ToolTip="드래그하여 즐겨찾기 순서 변경" PreviewMouseLeftButtonDown="ReorderStart" /><Image Source="{Binding IconImage}" Width="16" Height="16" Margin="0,0,6,0" RenderOptions.BitmapScalingMode="HighQuality"/><TextBlock Text="{Binding Title}" FontSize="{DynamicResource FontSize11}" TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentPath}" Foreground="{DynamicResource TextBrush}"/></DockPanel>
+       <TextBlock Text="{Binding CurrentPath}" FontSize="{DynamicResource FontSize9}" FontFamily="{DynamicResource MetadataFont}" Foreground="{DynamicResource MutedBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentPath}" Margin="0,3,0,0"/>
+       <TextBox Text="{Binding Note, UpdateSourceTrigger=PropertyChanged}" Visibility="{Binding NoteVisible, Converter={StaticResource BoolVisibility}}" FontSize="{DynamicResource FontSize10}" Padding="4" Margin="0,5,0,0" MaxHeight="64" TextWrapping="Wrap" AcceptsReturn="True" VerticalScrollBarVisibility="Auto" ToolTip="이 즐겨찾기만의 메모"/>
+      </StackPanel></Grid></Border></DataTemplate></ListBox.ItemTemplate>
+     </ListBox>
+     <TextBlock Grid.Row="2" Text="선택한 파일을 등록하면&#10;여기에 목록으로 표시됩니다." TextAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}" IsHitTestVisible="False"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Favorites.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+    </Grid>
+    <GridSplitter Grid.Row="1" Height="5" HorizontalAlignment="Stretch" Background="{DynamicResource BorderBrush}" Margin="0,0,0,0"/>
+    <Grid Grid.Row="2" Margin="0,12,0,0"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+     <WrapPanel Margin="0,0,0,10"><TextBlock Text="최근 연 파일" FontSize="{DynamicResource FontSize14}" FontWeight="{DynamicResource HeadingWeight}" VerticalAlignment="Center"/><Button Content="{Binding RecentColumnsLabel}" Tag="Recent" Click="ShowFileColumns" Padding="5,2" Margin="8,0,0,0"/><TextBlock Text="최근 100개까지 표시" FontSize="{DynamicResource FontSize10}" Margin="8,0,0,0" VerticalAlignment="Center" Foreground="{DynamicResource MutedBrush}"/></WrapPanel>
+
+     <ListBox ScrollViewer.CanContentScroll="False" x:Name="RecentFilesList" Grid.Row="2" ItemsSource="{Binding RecentFiles}" BorderThickness="0" Background="Transparent" HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" MouseDoubleClick="RecentOpen" KeyDown="RecentKeyDown" PreviewMouseLeftButtonDown="RecentMouseDown" PreviewMouseMove="RecentMouseMove">
+      <ListBox.ItemContainerStyle><Style TargetType="ListBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch"/><Setter Property="Padding" Value="0"/><Setter Property="Margin" Value="0"/></Style></ListBox.ItemContainerStyle><ListBox.ItemsPanel><ItemsPanelTemplate><local:FolderGridPanel Columns="{Binding RecentColumns}"/></ItemsPanelTemplate></ListBox.ItemsPanel><ListBox.ItemTemplate><DataTemplate><Border Background="Transparent" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,6"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel>
+       <DockPanel><Image Source="{Binding IconImage}" Width="16" Height="16" Margin="0,0,6,0"/><TextBlock Text="{Binding Title}" FontSize="{DynamicResource FontSize11}" TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentPath}" Foreground="{DynamicResource TextBrush}"/></DockPanel>
+       <TextBlock Text="{Binding CurrentPath}" FontSize="{DynamicResource FontSize9}" Foreground="{DynamicResource MutedBrush}" TextTrimming="CharacterEllipsis" ToolTip="{Binding CurrentPath}" Margin="0,3,0,0"/>
+       <TextBlock Text="{Binding OpenedDisplay}" FontSize="{DynamicResource FontSize9}" Foreground="{DynamicResource MutedBrush}" Margin="0,2,0,0"/>
+      </StackPanel></Grid></Border></DataTemplate></ListBox.ItemTemplate>
+     </ListBox>
+     <TextBlock Grid.Row="2" Text="PinShelf에서 파일을 열면&#10;여기에 기록됩니다." VerticalAlignment="Center" TextAlignment="Center" Foreground="{DynamicResource MutedBrush}" IsHitTestVisible="False"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding RecentFiles.Count}" Value="0"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock>
+    </Grid>
+    </Grid>   </Border>
+  </Grid>
+ </DockPanel>
+</Grid></Window>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
