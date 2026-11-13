@@ -1,4 +1,4 @@
-# 검증 기록 · 2026-11-10
+﻿# 검증 기록 · 2026-11-10
 
 ## 환경과 설치
 
@@ -35,7 +35,7 @@
 
 스킨 추가 후 Release 빌드 경고/오류 0개, 기존 통합 검증 및 스킨 전환/복원 검증을 통과했습니다. `artifacts/tests-20261110-083524/`에 Windows 11 및 Vercel 화면과 결과가 있습니다.
 
-Windows UI 자동화 도구가 프로젝트 경로 `D:\[나] 개발\PinShelf`를 glob으로 처리하면서 커널 시작에 실패했습니다(`filesystem glob path ... only supports deny access`). 따라서 물리적 마우스 조작, 기본 연결 프로그램 실행, 외부 탐색기 드롭, 파일/폴더 선택 창은 자동 UI 검증 완료로 보고하지 않습니다. 관련 기능 코드는 구현되어 있으며 수동 확인이 필요합니다.
+Windows UI 자동화 도구가 프로젝트 경로 `D:\[나] 개발\Mycelview`를 glob으로 처리하면서 커널 시작에 실패했습니다(`filesystem glob path ... only supports deny access`). 따라서 물리적 마우스 조작, 기본 연결 프로그램 실행, 외부 탐색기 드롭, 파일/폴더 선택 창은 자동 UI 검증 완료로 보고하지 않습니다. 관련 기능 코드는 구현되어 있으며 수동 확인이 필요합니다.
 
 접근 거부 ACL, 감시 버퍼 초과, 네트워크 드라이브, 수천 장 카드, 수십만 파일, Windows 10, 다중 DPI 모니터는 검증하지 않았습니다. 카드 전체 가상화는 미구현입니다.
 
@@ -113,7 +113,7 @@ artifacts/tests-20261110-101545: 빌드 및 새 프로세스 복원 포함 전�
 - 드래그 중 컬렉션을 바꾸지 않고 화면 Transform만 이동. 고정 슬롯 기준 판정, 마우스 캡처, 포인터를 따라오는 미리보기, 놓을 때 1회 Move.
 - 폴더/즐겨찾기 각각 정지 포인터 반복 입력, 즉시 역방향 전환, 영역 밖 취소, 1회 변경 검증 통과. drag-results.txt에 기록.
 - Windows 11 / Vercel 렌더 이미지에서 슬로건 오른쪽 배치, 한 줄 검색 안내, 50 DIP 카드 헤더 확인. 같은 높이에서 목록 공간 증가.
-- 물리적 OS 마우스 입력은 실행하지 못함. @oai/sky 초기화와 cua.getState 모두 node_repl kernel 초기화 중 프로젝트 경로 D:\[나] 개발\PinShelf를 glob으로 잘못 처리하여 종료. 실제 마우스로 부드러움을 확인했다고 주장하지 않음.
+- 물리적 OS 마우스 입력은 실행하지 못함. @oai/sky 초기화와 cua.getState 모두 node_repl kernel 초기화 중 프로젝트 경로 D:\[나] 개발\Mycelview를 glob으로 잘못 처리하여 종료. 실제 마우스로 부드러움을 확인했다고 주장하지 않음.
 
 ## Windows 파일 관리 검증 — 2026-11-10
 
@@ -135,9 +135,9 @@ artifacts/tests-20261110-110602/file-operation-results.txt: 실제 Windows IFile
 
 artifacts/tests-20261110-120323: Release 경고/오류 0, 전체 테스트와 새 프로세스 복원 통과. 실제 WPF 드래그 이벤트와 Windows 파일 엔진으로 다중 파일/폴더 복사, 현재 폴더로 이동, 등록 경로 갱신, 중복 실행 차단 및 드래그 취소 검증. 기존 엔진 테스트로 충돌 처리와 진행 중 취소 검증. 메모 호버 열림/편집 바인딩 확인. 두 스킨 카드 렌더 및 검색 정보 한 줄 이미지 확인. 물리적 OS 마우스 드래그는 node_repl의 대괄호 경로 초기화 오류로 미검증.
 
-## 2026-11-10 실제 OS 입력 QA (D:\PinShelf, 12:11–12:26 KST)
+## 2026-11-10 실제 OS 입력 QA (D:\Mycelview, 12:11–12:26 KST)
 
-프로젝트 없는 채팅에서 node_repl + @oai/sky 초기화 및 실제 Windows 입력 연결 성공. 원본 D:\[나] 개발\PinShelf 앱/업무 자료/사용자 등록 설정은 건드리지 않았다. --manual-qa <directory> 실행 옵션을 추가하여 별도 workspace.json 및 테스트 자료만 사용하고 PC 전체 인덱싱을 시작하지 않았다. QA 창 제목은 PinShelf — Manual QA.
+프로젝트 없는 채팅에서 node_repl + @oai/sky 초기화 및 실제 Windows 입력 연결 성공. 원본 D:\[나] 개발\Mycelview 앱/업무 자료/사용자 등록 설정은 건드리지 않았다. --manual-qa <directory> 실행 옵션을 추가하여 별도 workspace.json 및 테스트 자료만 사용하고 PC 전체 인덱싱을 시작하지 않았다. QA 창 제목은 Mycelview — Manual QA.
 
 ### 수정
 - 메모 hover Popup의 StaysOpen=False에 의한 마우스 캡처를 제거했다. 클릭 편집과 외부 클릭 닫힘을 별도 처리하고, 팝업 내부 제목/여백도 호버 유지 영역에 포함했다. 창 비활성화 시 닫고 Unloaded 시 구독을 해제한다.
@@ -165,7 +165,7 @@ artifacts/tests-20261110-120323: Release 경고/오류 0, 전체 테스트와 �
 - 메모 클릭은 편집 진입으로 통일하여 반복 클릭으로 닫히지 않게 변경. 호버 Popup 표면 클릭도 입력 포커스를 지연 전달하여 첫 입력부터 반영. 우측 하단에 작은 흐린 '실시간 저장됩니다' 안내.
 - 실제 sky OS 입력: 버튼 호버 열림/이탈 닫힘, 버튼 1회 클릭 입력, Popup 제목 1회 클릭 입력, 앱 내 외부 클릭 닫힘, 접기/펼치기 방향 변경 확인. 입력 후 별도 저장 없이 QA workspace.json 내용 갱신 확인.
 - 최종 검증본 .\build.ps1 -Test PASS (경고/오류 0), artifacts/tests-20261110-124053.
-- 원본 소스 및 사용자 설정 백업: D:\PinShelf\artifacts\deploy-backup-20261110. 기존 사용자 앱 정상 종료 후 workspace-before-deploy.json 추가 보관. 사용자 workspace.json을 테스트 설정으로 덮어쓰지 않는다.
+- 원본 소스 및 사용자 설정 백업: D:\Mycelview\artifacts\deploy-backup-20261110. 기존 사용자 앱 정상 종료 후 workspace-before-deploy.json 추가 보관. 사용자 workspace.json을 테스트 설정으로 덮어쓰지 않는다.
 
 - 원본 경로 빌드·전체 테스트·새 프로세스 복원 PASS: artifacts/tests-20261110-124258. 등록 카드 5개 및 카드 전체 데이터(메모 포함), 스킨, 레이아웃이 배포 전 백업과 동일함을 확인. 원본 경로 최신 DLL로 일반 앱 실행.
 
@@ -176,7 +176,7 @@ artifacts/tests-20261110-120323: Release 경고/오류 0, 전체 테스트와 �
 - 실제 OS 입력으로 테스트 파일 우클릭 메뉴의 단색 배경, 아이콘 크기와 중앙 점 배치 확인.
 - .\build.ps1 -Test PASS, 경고/오류 0: artifacts/tests-20261110-124839.
 - sky 및 cua Windows API 문서를 재확인: drag modifier/키 유지/중간 Esc 입력 미지원. cua 문서도 Windows key 및 durationMs 옵션 거부를 명시. 실제 Ctrl+drag/Esc 중간 입력은 자동 실행하지 않았다. routed 이벤트 및 실제 파일 엔진 회귀는 통과.
-- 수동 확인 전용 설정과 파일: D:\PinShelf\artifacts\ctrl-esc-manual-20261110 (source/01-copy.txt, source/02-escape.txt, 빈 target). 사용자 workspace와 분리.
+- 수동 확인 전용 설정과 파일: D:\Mycelview\artifacts\ctrl-esc-manual-20261110 (source/01-copy.txt, source/02-escape.txt, 빈 target). 사용자 workspace와 분리.
 
 - 원본 경로 최종 전체 테스트 PASS: artifacts/tests-20261110-125039. 원본 최신 앱 재실행 및 14px 아이콘/중앙 점 확인. 배포 후 카드 전체 데이터·메모·스킨·레이아웃 보존 확인. Ctrl/Esc 수동 검증 창 준비 후 사용자 입력 대기; 미실행을 통과로 표기하지 않음.
 
@@ -193,7 +193,7 @@ artifacts/tests-20261110-135531: Release 경고/오류 0, 전체 회귀 및 별�
 - 실행 취소 후 .hold 임시 자료는 확인창 없이 휴지통으로 정리하고 영구 삭제 전환을 거부한다. 정리 실패 시 원래 위치의 .hold 자료를 남기고 상태에 알린다. 개발 중 노출된 휴지통 확인창은 수정 후 최종 테스트에서 발생하지 않음.
 - Ctrl+Z는 앱 파일 작업에 적용하되 메모/검색 등 텍스트 입력 중에는 원래 텍스트 실행 취소를 유지한다. 우클릭 메뉴와 상단 ↶ 버튼도 제공한다. 현재 테스트는 이벤트/작업 엔진 검증이며 새 단축키의 물리적 키 입력 QA는 포함하지 않는다.
 - 기본 스킨 강조색 #1687F8, 로고 외부 회색 배경 제거/상단 여백 축소. 왼쪽 위로·새로고침 버튼을 카드와 동일한 20×22 DIP, 간격 5 DIP, 회색 벡터와 두께로 통일.
-- ICO에 16/20/24/32/48/64/128/256 크기를 포함. ApplicationIcon과 Window.Icon을 지정하고 run.ps1은 로컬 런타임을 사용하는 PinShelf.exe를 실행한다. 설치 프로그램/바로가기 생성 자체는 후속 과제.
+- ICO에 16/20/24/32/48/64/128/256 크기를 포함. ApplicationIcon과 Window.Icon을 지정하고 run.ps1은 로컬 런타임을 사용하는 Mycelview.exe를 실행한다. 설치 프로그램/바로가기 생성 자체는 후속 과제.
 - 글자 크기 70~200%, ±1%, 퍼센트 클릭 100% 복귀. 전체 앱 XAML 글꼴 리소스, 파일명/폴더명, 자체 파일 작업 대화상자 반영. Windows 자체 대화상자/제목 표시줄은 OS 설정을 따른다. 배율 저장/백업/복원/별도 프로세스 재시작과 200% 파일명 22 DIP 확인. windows11.png, text-200.png 렌더 확인.
 
 ## 팝업 창 이동 추적 (2026-11-10)
@@ -202,10 +202,10 @@ artifacts/tests-20261110-145718: 전체 테스트 및 새 프로세스 복원 PA
 
 ## 2026-11-10 팝업 실제 OS 마우스 QA 완료
 
-대상: D:\PinShelf, --manual-qa artifacts/popup-mouse-qa-20261110. computer-use sky 실제 drag 사용. 일반 사용자 앱 및 원본 소스에는 이번 QA 변경을 반영하지 않았다.
+대상: D:\Mycelview, --manual-qa artifacts/popup-mouse-qa-20261110. computer-use sky 실제 drag 사용. 일반 사용자 앱 및 원본 소스에는 이번 QA 변경을 반영하지 않았다.
 
 ### 변경 파일
-- src/PinShelf/App.xaml.cs: --manual-qa의 선택적 세 번째 인자로 명시한 테스트 폴더만 인덱싱. 일반 실행 동작 변경 없음. 검색 테스트 606개 fixture만 인덱싱하여 2027 검색 결과 2건(결산 2027.txt, 예산 2027 초안.txt)을 확인.
+- src/Mycelview/App.xaml.cs: --manual-qa의 선택적 세 번째 인자로 명시한 테스트 폴더만 인덱싱. 일반 실행 동작 변경 없음. 검색 테스트 606개 fixture만 인덱싱하여 2027 검색 결과 2건(결산 2027.txt, 예산 2027 초안.txt)을 확인.
 - docs/VALIDATION.md: 이 검증 기록. 팝업 추적 제품 코드 추가 수정 없음.
 - 이전 별도 UI 요청(아이콘 크기/두께, 중앙 점, 메뉴 음영, 메모 UX)은 앞 절 기록처럼 원본 반영 완료된 상태이며 이번 팝업 QA 수정과 별개.
 
@@ -267,7 +267,7 @@ artifacts/tests-20261110-170757: Release 경고/오류 0, 전체 통합 및 별�
 ## 2026-11-11 네이티브 우클릭 실제 OS 마우스 QA
 - 대상: artifacts/menu-mouse-qa-20261111/state 별도 설정, fixtures 테스트 자료. 프로젝트 로컬 dotnet으로 기존 Release DLL을 --manual-qa 실행. 제품 코드 변경 없음.
 - computer-use @oai/sky의 좌표 기반 right/left click으로 검증. 이벤트 직접 호출이나 자동 통합 테스트 결과와 구분.
-- PASS: alpha.txt 실제 우클릭으로 Windows Shell 메뉴 및 설치된 압축/연결 프로그램 확장 메뉴 표시. PinShelf 미리보기 클릭으로 alpha 본문 확인, Esc 후 미리보기 창 종료 확인.
+- PASS: alpha.txt 실제 우클릭으로 Windows Shell 메뉴 및 설치된 압축/연결 프로그램 확장 메뉴 표시. Mycelview 미리보기 클릭으로 alpha 본문 확인, Esc 후 미리보기 창 종료 확인.
 - PASS: 미선택 beta.txt 우클릭 시 alpha 선택이 해제되고 beta 선택 및 beta.zip 메뉴로 대상 전환. 이름 변경 메뉴 클릭 시 현재/새 이름 beta.txt 한 행 표시, 취소 클릭 후 원래 이름 유지.
 - PASS: 파일 선택 상태에서 목록 빈 공간 우클릭 시 파일용 Shell 메뉴 대신 다시 실행/실행 취소/붙여넣기/새 폴더 관리 메뉴 표시. 새 폴더 만들기와 만들기 버튼을 마우스로 클릭하여 fixtures/새 폴더 생성, 목록 3→4개 및 완료 1개 표시 확인.
 - PASS: 하위 폴더 우클릭 시 폴더용 열기/새 탭/새 창 및 폴더명을 반영한 압축 메뉴 표시. 바깥 클릭으로 메뉴 닫힘.
@@ -332,7 +332,7 @@ artifacts/tests-20261110-170757: Release 경고/오류 0, 전체 통합 및 별�
 - 정상 Release 경로로 빌드 완료(오류 0, NU1900 취약성 서버 연결 경고 1). 기존 앱을 정상 종료 후 업데이트하여 다시 실행. 사용자 업무 파일 수정 없음.
 
 ## 2026-11-11 활성 업무 탭에 우클릭 등록
-- Windows Shell 메뉴의 열기/미리보기 다음, Windows 탐색기로 열기 앞에 PinShelf 로고와 함께 등록 명령 추가.
+- Windows Shell 메뉴의 열기/미리보기 다음, Windows 탐색기로 열기 앞에 Mycelview 로고와 함께 등록 명령 추가.
 - 폴더는 ‘폴더 즐겨찾기에 추가’, 파일은 ‘파일 즐겨찾기에 추가’. 혼합 선택에는 두 명령을 표시하며 선택된 해당 종류만 현재 활성 탭에 등록한다. 공통 메뉴를 사용하는 탐색기 트리/목록, 폴더 카드 제목/내용 및 기타 파일 목록에 일관되게 적용한다.
 - 기존 AddPath 등록 경로를 사용하므로 원본 이동/복사 없이 카드/즐겨찾기 및 자동 저장에 반영된다.
 - artifacts/register-menu-20261111 자동 테스트 종료 코드 0: Shell 항목 순서·아이콘 보존, 등록 메뉴 위치와 종류별 표시, 혼합 선택 처리, 활성 탭만 변경, 탭 왕복 후 유지 및 기존 파일 작업 회귀 통과.

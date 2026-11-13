@@ -1,0 +1,5 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+ <Geometry x:Key="LogoFrame">M8,88 L8,24 C8,13 17,5 28,5 L72,5 C83,5 92,13 92,24 L92,88 L84,88 L84,24 C84,17 79,13 72,13 L28,13 C21,13 16,17 16,24 L16,88 Z</Geometry>
+ <Geometry x:Key="LogoLinks">M8,87 L23,39 L29,36 L50,57 L71,36 L77,39 L92,87 L84,90 L71,46 L50,67 L29,46 L16,90 Z</Geometry>
+ <Geometry x:Key="LogoNodes">M19,40 A8,8 0 1 0 35,40 A8,8 0 1 0 19,40 M42,62 A8,8 0 1 0 58,62 A8,8 0 1 0 42,62 M65,40 A8,8 0 1 0 81,40 A8,8 0 1 0 65,40 M4,88 A8,8 0 1 0 20,88 A8,8 0 1 0 4,88 M80,88 A8,8 0 1 0 96,88 A8,8 0 1 0 80,88</Geometry>
+</ResourceDictionary>

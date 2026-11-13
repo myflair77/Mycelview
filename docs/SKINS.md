@@ -1,4 +1,4 @@
-# 디자인 스킨
+﻿# 디자인 스킨
 
 상단 **디자인** 선택에서 즉시 변경합니다. 선택은 workspace.json의 `SkinId`에 저장됩니다. 이전 설정에 필드가 없거나 알 수 없는 ID인 경우 Windows 11로 돌아갑니다. 카드 구성·메모·배치는 유지됩니다.
 
@@ -11,7 +11,7 @@
 
 ## 스킨 추가 방법
 
-1. `src/PinShelf/Themes/windows11.xaml`을 새 ID의 XAML 파일로 복사합니다.
+1. `src/Mycelview/Themes/windows11.xaml`을 새 ID의 XAML 파일로 복사합니다.
 2. 색상 브러시, CardRadius/ButtonRadius, UiFont/MetadataFont, HeadingWeight를 정의합니다. 기존 키를 모두 유지합니다.
 3. 필요하면 Button 등 컨트롤의 암시적 스타일을 추가합니다. 공통 BaseButton은 기능과 기본 간격을 제공합니다.
 4. `SkinManager.Options`에 고유 ID와 표시 이름을 추가합니다. 파일 이름은 ID와 동일하게 지정합니다.

@@ -1,4 +1,4 @@
-﻿# PinShelf 아키텍처
+﻿# Mycelview 아키텍처
 
 ## 경계
 
@@ -31,7 +31,7 @@ FolderGridPanel은 2열로 측정/배치하고 행마다 더 큰 카드 높이�
 
 ## 순서 / 공통 높이 / 열 설정 / 로고
 
-폴더와 파일 순서는 Folders/Favorites 컬렉션에서 Move하고, 저장 시 그 순서를 직렬화합니다. 경로가 같은 항목도 Guid로 구분합니다. 드래그에는 전용 PinShelf.ItemOrder 형식을 사용하여 파일 시스템 드롭 등록과 구분합니다. 대상의 앞/뒤 위치를 Adorner로 표시하고 가장자리 자동 스크롤을 지원합니다.
+폴더와 파일 순서는 Folders/Favorites 컬렉션에서 Move하고, 저장 시 그 순서를 직렬화합니다. 경로가 같은 항목도 Guid로 구분합니다. 드래그에는 전용 Mycelview.ItemOrder 형식을 사용하여 파일 시스템 드롭 등록과 구분합니다. 대상의 앞/뒤 위치를 Adorner로 표시하고 가장자리 자동 스크롤을 지원합니다.
 
 WorkspaceState의 FolderHeight, ShowModified/ShowSize/ShowType/ShowCreated/ShowExtension은 이전 설정에 없으면 기본값을 사용합니다. 높이는 펼친 카드 전체에 일괄 적용하며, 열은 DataGridColumn의 Visibility를 공유 VM에 바인딩합니다. 생성일은 비동기 파일 열거 시 함께 읽으며 유형은 Windows Shell 조회 결과를 확장자별 캐시합니다.
 

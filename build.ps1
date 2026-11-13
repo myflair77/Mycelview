@@ -1,4 +1,4 @@
-param([switch]$Test)
+﻿param([switch]$Test)
 $ErrorActionPreference = 'Stop'
 $env:DOTNET_CLI_HOME = Join-Path $PSScriptRoot '.tools\cli-home'
 $env:DOTNET_CLI_TELEMETRY_OPTOUT = '1'
@@ -7,13 +7,13 @@ $env:DOTNET_GENERATE_ASPNET_CERTIFICATE = 'false'
 $env:DOTNET_ADD_GLOBAL_TOOLS_TO_PATH = 'false'
 $dotnetExe = Join-Path $PSScriptRoot '.tools\dotnet\dotnet.exe'
 if (!(Test-Path -LiteralPath $dotnetExe)) { $dotnetExe = (Get-Command dotnet -ErrorAction Stop).Source }
-& $dotnetExe restore (Join-Path $PSScriptRoot 'src\PinShelf\PinShelf.csproj') --configfile (Join-Path $PSScriptRoot 'NuGet.Config')
+& $dotnetExe restore (Join-Path $PSScriptRoot 'src\Mycelview\Mycelview.csproj') --configfile (Join-Path $PSScriptRoot 'NuGet.Config')
 if ($LASTEXITCODE -ne 0) { throw 'Restore failed.' }
-& $dotnetExe build (Join-Path $PSScriptRoot 'src\PinShelf\PinShelf.csproj') -c Release --no-restore --nologo
+& $dotnetExe build (Join-Path $PSScriptRoot 'src\Mycelview\Mycelview.csproj') -c Release --no-restore --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
 if ($Test) {
     $testDir = Join-Path $PSScriptRoot ('artifacts\tests-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
-    $dll = Join-Path $PSScriptRoot 'src\PinShelf\bin\Release\net10.0-windows\PinShelf.dll'
+    $dll = Join-Path $PSScriptRoot 'src\Mycelview\bin\Release\net10.0-windows\Mycelview.dll'
     & $dotnetExe $dll --self-test $testDir
     if ($LASTEXITCODE -ne 0) { throw "Smoke test failed. See $testDir" }
     & $dotnetExe $dll --verify-test $testDir
