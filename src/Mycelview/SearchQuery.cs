@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 
 namespace Mycelview;
 
@@ -6,12 +6,24 @@ public static class SearchQuery
 {
     private enum Kind { Term, And, Or, Not, Left, Right, End }
     private sealed record Token(Kind Kind, string Text, int Position);
-    public sealed record Plan(Func<string, bool> Match, Func<string, string, bool> MatchCached, string Sql, List<string> Parameters);
-    private sealed record Node(Func<string, bool> Match, Func<string, string, bool> MatchCached, string Sql);
+    public delegate bool SpanMatcher(ReadOnlySpan<char> text, ReadOnlySpan<char> initials);
+    public sealed record Plan(Func<string, bool> Match, Func<string, string, bool> MatchCached, string Sql, List<string> Parameters)
+    {
+        public SpanMatcher MatchSpans { get; init; } = (s, i) => MatchCached(s.ToString(), i.ToString());
+    }
+    private sealed record Node(Func<string, bool> Match, SpanMatcher MatchCached, string Sql);
     public static string Initials(string text)
     {
         const string initials = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
-        return new string(text.Select(c => c >= '\uAC00' && c <= '\uD7A3' ? initials[(c - '\uAC00') / 588] : c).ToArray());
+        if (!text.Any(c => c >= '\uAC00' && c <= '\uD7A3')) return text;
+        return string.Create(text.Length, text, (span, source) =>
+        {
+            for (int i = 0; i < source.Length; i++)
+            {
+                char c = source[i];
+                span[i] = c >= '\uAC00' && c <= '\uD7A3' ? initials[(c - '\uAC00') / 588] : c;
+            }
+        });
     }
     public static Func<string, bool> Parse(string input) => Compile(input).Match;
     public static Plan Compile(string input, SearchOptions? options = null)
@@ -85,7 +97,7 @@ public static class SearchQuery
         }
         var result = Or();
         if (tokens[index].Kind != Kind.End) throw new FormatException($"{tokens[index].Position + 1}번째 위치의 괄호 또는 연산자를 확인하세요.");
-        return new(result.Match, result.MatchCached, result.Sql, parameters);
+        return new(result.Match, (s, i) => result.MatchCached(s, i), result.Sql, parameters) { MatchSpans = result.MatchCached };
     }
 }
 

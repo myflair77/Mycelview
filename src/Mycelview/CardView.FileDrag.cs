@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -55,17 +55,38 @@ public partial class CardView
         if (result == DragDropEffects.None) { Workspace.Status = "파일 드래그를 취소했습니다. 원본은 변경하지 않았습니다."; return; }
         await payload.CompleteAsync(result, host.ViewModel.FileTasks);
     }
+    private string TransferDestination(DragEventArgs e)
+    {
+        var source=e.OriginalSource as DependencyObject;
+        var row=FileContextMenus.Parent<DataGridRow>(source);
+        var icon=FileContextMenus.Parent<ListBoxItem>(source);
+        var entry=row?.Item as FileEntry ?? icon?.DataContext as FileEntry;
+        return entry is { IsDirectory:true, IsShellItem:false } ? entry.FullPath : Card.CurrentPath;
+    }
     private void FileTransferOver(object sender, DragEventArgs e)
     {
-        if (CardFileDrag.Read(e.Data) is not { } payload) return;
+        var destination=TransferDestination(e);
+        if (CardFileDrag.Read(e.Data) is not { } payload)
+        {
+            if(!e.Data.GetDataPresent(DataFormats.FileDrop))return;
+            e.Handled=true;
+            var paths=ExternalFileDrop.Paths(e.Data);
+            e.Effects=ExternalFileDrop.Effect(paths,destination,e.KeyStates,e.AllowedEffects,Workspace.FileTasks.Busy);
+            if(e.Effects==DragDropEffects.None){ClearTransferHint();return;}
+            TransferHint.Text=$"{paths.Length}개 {(e.Effects==DragDropEffects.Copy?"복사":"이동")} · Ctrl: 복사 · Shift: 이동";
+            TransferHint.ToolTip=destination;TransferHint.Text+=" → "+System.IO.Path.GetFileName(System.IO.Path.TrimEndingDirectorySeparator(destination));TransferOverlay.Visibility=Visibility.Visible;
+            Workspace.Status=TransferHint.Text+" → "+destination;
+            return;
+        }
         e.Handled = true;
-        e.Effects = payload.Effect(Card.State.Id, Card.CurrentPath, e.KeyStates, e.AllowedEffects, Workspace.FileTasks.Busy);
-        if (e.Effects == DragDropEffects.None) { ClearTransferHint(); Workspace.Status = "이 카드에는 놓을 수 없습니다. 다른 폴더 카드로 이동하세요."; return; }
+        e.Effects = payload.Effect(Card.State.Id, destination, e.KeyStates, e.AllowedEffects, Workspace.FileTasks.Busy);
+        if (e.Effects == DragDropEffects.None) { ClearTransferHint(); Workspace.Status = "이 위치에는 놓을 수 없습니다."; return; }
         var copy = e.Effects == DragDropEffects.Copy;
         TransferHint.Text = $"{payload.Entries.Count}개 {(copy ? "복사" : "이동")} · {(copy ? "Ctrl을 놓으면 이동" : "Ctrl을 누르면 복사")}";
-        TransferHint.ToolTip = Card.CurrentPath;
+        TransferHint.ToolTip = destination;
+        TransferHint.Text += " → " + System.IO.Path.GetFileName(System.IO.Path.TrimEndingDirectorySeparator(destination));
         TransferOverlay.Visibility = Visibility.Visible;
-        Workspace.Status = $"{payload.Entries.Count}개 {(copy ? "복사" : "이동")} → {Card.CurrentPath} · 카드에 현재 열린 폴더로 작업 · Esc 취소";
+        Workspace.Status = $"{payload.Entries.Count}개 {(copy ? "복사" : "이동")} → {destination} · Esc 취소";
         var scroll = FileContextMenus.Parent<ScrollViewer>(VisualTreeHelper.GetParent(this));
         if (scroll != null && (DateTime.UtcNow - lastTransferScroll).TotalMilliseconds >= 60)
         {
@@ -77,16 +98,29 @@ public partial class CardView
     }
     private void FileTransferLeave(object sender, DragEventArgs e)
     {
-        if (CardFileDrag.Read(e.Data) == null) return;
+        if (CardFileDrag.Read(e.Data) == null && !e.Data.GetDataPresent(DataFormats.FileDrop)) return;
         var point = e.GetPosition(this);
         if (!new Rect(RenderSize).Contains(point)) ClearTransferHint();
     }
-    private void FileTransferDrop(object sender, DragEventArgs e)
+    private async void FileTransferDrop(object sender, DragEventArgs e)
     {
-        if (CardFileDrag.Read(e.Data) is not { } payload) return;
+        var destination=TransferDestination(e);
+        if (CardFileDrag.Read(e.Data) is not { } payload)
+        {
+            if(!e.Data.GetDataPresent(DataFormats.FileDrop))return;
+            e.Handled=true;
+            var paths=ExternalFileDrop.Paths(e.Data);
+            e.Effects=ExternalFileDrop.Effect(paths,destination,e.KeyStates,e.AllowedEffects,Workspace.FileTasks.Busy);
+            if(e.Effects==DragDropEffects.None){ClearTransferHint();return;}
+            var copy=e.Effects==DragDropEffects.Copy;
+            ClearTransferHint();
+            await System.Windows.Threading.Dispatcher.Yield(System.Windows.Threading.DispatcherPriority.Background);
+            await Workspace.FileTasks.TransferAsync(paths,destination,copy);
+            return;
+        }
         e.Handled = true; ClearTransferHint();
-        e.Effects = payload.Effect(Card.State.Id, Card.CurrentPath, e.KeyStates, e.AllowedEffects, Workspace.FileTasks.Busy);
-        if (e.Effects != DragDropEffects.None) payload.Accepted = new(Card.CurrentPath, e.Effects == DragDropEffects.Copy);
+        e.Effects = payload.Effect(Card.State.Id, destination, e.KeyStates, e.AllowedEffects, Workspace.FileTasks.Busy);
+        if (e.Effects != DragDropEffects.None) payload.Accepted = new(destination, e.Effects == DragDropEffects.Copy);
     }
     internal void ClearTransferHint() => TransferOverlay.Visibility = Visibility.Collapsed;
 }

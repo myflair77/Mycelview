@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 using System.Text.Json;
 
@@ -16,6 +16,15 @@ public sealed class StateStore(string directory)
     internal static WorkspaceState Parse(string json)
     {
         var state = JsonSerializer.Deserialize<WorkspaceState>(json) ?? throw new InvalidDataException("설정 내용이 비어 있습니다.");
+        state.LauncherFavorites ??= [];
+        var launcherIds = new HashSet<Guid>();
+        foreach (var item in state.LauncherFavorites)
+        {
+            if (item == null || item.Id == Guid.Empty || !launcherIds.Add(item.Id) ||
+                string.IsNullOrWhiteSpace(item.Name) || string.IsNullOrWhiteSpace(item.Target) ||
+                item.BrowserPath == null || item.Kind is not ("App" or "Browser" or "Website"))
+                throw new InvalidDataException("앱·브라우저·사이트 즐겨찾기 설정이 잘못되었습니다.");
+        }
         state.Enlargement = (state.Enlargement ?? new()).Normalize();
         using var document = JsonDocument.Parse(json);
         if (!document.RootElement.TryGetProperty("TextScaleBaseVersion", out var baseline) || baseline.GetInt32() < 2)
@@ -46,7 +55,7 @@ public sealed class StateStore(string directory)
             if (c is null || string.IsNullOrWhiteSpace(c.InitialPath) || string.IsNullOrWhiteSpace(c.CurrentPath) || c.Title is null || c.Note is null)
                 throw new InvalidDataException("카드 설정의 경로 또는 텍스트가 잘못되었습니다.");
             c.Width = double.IsFinite(c.Width) ? Math.Clamp(c.Width, 340, 1800) : 460;
-            c.Height = double.IsFinite(c.Height) ? Math.Clamp(c.Height, 220, 1400) : 340;
+            c.Height = double.IsFinite(c.Height) ? Math.Clamp(c.Height, 220, 1400) : 380;
             c.X = double.IsFinite(c.X) ? Math.Clamp(c.X, 0, 100000) : 20;
             c.Y = double.IsFinite(c.Y) ? Math.Clamp(c.Y, 0, 100000) : 20;
         }
@@ -92,6 +101,8 @@ public static class FileService
         if (isFile) FileOpened?.Invoke(path);
     }
 }
+
+
 
 
 

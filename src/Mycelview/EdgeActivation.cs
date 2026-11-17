@@ -1,10 +1,11 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Threading;
 namespace Mycelview;
 public sealed class EdgeActivationSettings
 {
+    public List<AppWindowZone> AppZones { get; set; } = [];
     public bool Enabled { get; set; } = true;
     public string Edge { get; set; } = "Left";
     public int DelayMs { get; set; } = 100;
@@ -15,7 +16,7 @@ public sealed class EdgeActivationSettings
     public int StartPercent { get; set; } = 50;
     public int EndPercent { get; set; } = 100;
     public string Monitor { get; set; } = "Automatic";
-    public EdgeActivationSettings Normalize() => new() { Enabled = Enabled, ThicknessPixels = Math.Clamp(ThicknessPixels, 2, 30), StartPercent = Math.Clamp(StartPercent, 0, 99), EndPercent = Math.Clamp(EndPercent, Math.Clamp(StartPercent, 0, 99) + 1, 100), Edge = Edge is "Right" or "Top" or "Bottom" ? Edge : "Left", DelayMs = Math.Clamp(DelayMs, 100, 5000), Monitor = string.IsNullOrWhiteSpace(Monitor) || Monitor is "Leftmost" or "Rightmost" or "Topmost" or "Bottommost" ? "Automatic" : Monitor };
+    public EdgeActivationSettings Normalize() => new() { AppZones = (AppZones ?? []).Where(z => z != null && !string.IsNullOrWhiteSpace(z.AppPath)).Select(z => z.Normalized()).ToList(), Enabled = Enabled, ThicknessPixels = Math.Clamp(ThicknessPixels, 2, 30), StartPercent = Math.Clamp(StartPercent, 0, 99), EndPercent = Math.Clamp(EndPercent, Math.Clamp(StartPercent, 0, 99) + 1, 100), Edge = Edge is "Right" or "Top" or "Bottom" ? Edge : "Left", DelayMs = Math.Clamp(DelayMs, 100, 5000), Monitor = string.IsNullOrWhiteSpace(Monitor) || Monitor is "Leftmost" or "Rightmost" or "Topmost" or "Bottommost" ? "Automatic" : Monitor };
 }
 internal sealed record EdgeMonitor(string Device, int Left, int Top, int Right, int Bottom, bool Primary)
 {
@@ -83,6 +84,7 @@ internal sealed class EdgeActivationService : IDisposable
         var monitor = SelectMonitor(monitors, s.Monitor, s.Edge);
         marker.Update(monitor, s);
         if (!window.IsEnabled || GetAsyncKeyState(1) < 0 || GetAsyncKeyState(2) < 0) { dwell.Reset(); return; }
+        if (AppEdgeSwitcher.Matches(s, monitors, out _)) { dwell.Reset(); return; }
         string? zone = monitor != null && GetCursorPos(out var point) && InRange(monitor, s, point.X, point.Y) ? monitor.Device + s.Edge : null;
         if (dwell.Update(zone, now, s.DelayMs) && !window.IsActive) Reveal();
     }
@@ -126,3 +128,5 @@ internal sealed class EdgeActivationService : IDisposable
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint from, uint to, bool attach);
 }
+
+

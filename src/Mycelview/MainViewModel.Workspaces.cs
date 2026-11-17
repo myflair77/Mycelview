@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Text.Json;
 namespace Mycelview;
@@ -29,6 +29,9 @@ public sealed partial class MainViewModel
     }
     private void LoadWorkspaces(WorkspaceState state)
     {
+        FileDisplayPreferences.Current.ShowHidden = state.ShowHiddenFiles;
+        FileDisplayPreferences.Current.ShowExtensions = state.ShowFileExtensions;
+        SingleClickPreview = state.SingleClickPreview;
         Search.ApplyOptions(state.SearchOptions ?? new());
         EdgeActivation = (state.EdgeActivation ?? new()).Normalize();
         Workspaces.Clear();
@@ -53,7 +56,7 @@ public sealed partial class MainViewModel
         Cards.Clear(); Folders.Clear(); Favorites.Clear();
         foreach (var item in Workspaces) item.IsActive = item == tab;
         ActiveWorkspace = tab; Notify(nameof(ActiveWorkspace));
-        collapseNext = tab.CollapseNext; Notify(nameof(ToggleFoldersLabel));
+        collapseNext = tab.CollapseNext; Notify(nameof(ToggleFoldersLabel)); Notify(nameof(ToggleFolderPinsLabel));
         Layout = tab.Layout; FolderHeight = tab.FolderHeight; FolderColumns = tab.FolderColumns;
         FavoriteColumns = tab.FavoriteColumns; RecentColumns = tab.RecentColumns;
         ShowModified = tab.ShowModified; ShowSize = tab.ShowSize; ShowType = tab.ShowType;

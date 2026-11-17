@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 
 namespace Mycelview;
 internal sealed record CardDragEntry(string Path, bool Folder);
@@ -16,16 +16,23 @@ internal sealed class CardFileDrag
         var folders = distinct.Where(x => x.Folder).Select(x => x.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
         Entries = distinct.Where(x => !FileOperationRules.HasSelectedAncestor(x.Path, folders)).ToArray();
     }
-    internal DataObject ToData() => new(Format, this);
+    internal DataObject ToData()
+    {
+        var data=new DataObject(Format,this);
+        data.SetData(DataFormats.FileDrop,Entries.Select(x=>x.Path).ToArray());
+        return data;
+    }
     internal static CardFileDrag? Read(IDataObject data) => data.GetDataPresent(Format, false) ? data.GetData(Format, false) as CardFileDrag : null;
     internal DragDropEffects Effect(Guid target, string destination, DragDropKeyStates keys, DragDropEffects allowed, bool busy)
     {
-        if (busy || target == SourceCard || Entries.Count == 0 || string.IsNullOrWhiteSpace(destination) || (keys & DragDropKeyStates.AltKey) != 0) return DragDropEffects.None;
+        if (busy || Entries.Count == 0 || string.IsNullOrWhiteSpace(destination) || (keys & DragDropKeyStates.AltKey) != 0) return DragDropEffects.None;
         bool copy = (keys & DragDropKeyStates.ControlKey) != 0;
         var effect = copy ? DragDropEffects.Copy : DragDropEffects.Move;
         if ((allowed & effect) == 0) return DragDropEffects.None;
         try
         {
+            if (!System.IO.Directory.Exists(destination)) return DragDropEffects.None;
+            if (target == SourceCard && Entries.All(x => FileOperationRules.Same(System.IO.Path.GetDirectoryName(x.Path)!, destination))) return DragDropEffects.None;
             if (Entries.Any(x => x.Folder && (FileOperationRules.Same(destination, x.Path) || FileOperationRules.Inside(destination, x.Path)))) return DragDropEffects.None;
             if (!copy && Entries.All(x => FileOperationRules.Same(System.IO.Path.GetDirectoryName(x.Path)!, destination))) return DragDropEffects.None;
             return effect;

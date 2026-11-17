@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -28,9 +28,9 @@ public partial class MainWindow : Window
             if ((e.Key == Key.Z || e.Key == Key.Y) && Keyboard.Modifiers == ModifierKeys.Control && FileContextMenus.Parent<System.Windows.Controls.Primitives.TextBoxBase>(e.OriginalSource as DependencyObject) == null)
             { e.Handled = true; if (e.Key == Key.Y) await ViewModel.FileTasks.RedoAsync(); else await ViewModel.FileTasks.UndoAsync(); }
         };
-        Loaded += (_, _) => { ApplySearchSort(); UpdateFileSectionPins(); if (!TestMode && edgeActivation == null) edgeActivation = new(this); };
+        Loaded += (_, _) => { ApplySearchSort(); UpdateFileSectionPins(); if (!TestMode && edgeActivation == null) { edgeActivation = new(this); appEdgeSwitcher = new(this); } };
         vm.WorkspaceChanged += UpdateFileSectionPins;
-        Closed += (_, _) => edgeActivation?.Dispose();
+        Closed += (_, _) => { edgeActivation?.Dispose(); appEdgeSwitcher?.Dispose(); };
         SearchPopup.Opened += (_, _) => UpdateSearchPopupPlacement();
         SizeChanged += (_, _) => UpdateSearchPopupPlacement();
         LocationChanged += (_, _) => { SkinPicker.IsDropDownOpen = false; UpdateSearchPopupPlacement(); };
@@ -38,13 +38,18 @@ public partial class MainWindow : Window
         SearchBox.SizeChanged += (_, _) => Dispatcher.BeginInvoke(new Action(UpdateSearchPopupPlacement));
         FileMenus = new(vm) { PreviewPath = FilePreview.Show, UpdatePreview = path => FilePreview.Select(path), ClosePreview = FilePreview.Close, PreviewIsOpen = () => FilePreview.IsOpen };
         FileMenus.AttachGrid(ExplorerList, entry => _ = OpenExplorerEntry(entry), () => vm.Explorer.CurrentPath);
-        FileMenus.AttachGrid(SearchResults, entry => _ = OpenExplorerEntry(entry));
+        FileMenus.AttachGrid(SearchResults, entry => _ = OpenExplorerEntry(entry), searchResults: true);
         FileMenus.AttachList(FavoritesList, item => { var card = (CardViewModel)item; return new(card.CurrentPath, card.IsFolder, card); });
         FileMenus.AttachList(RecentFilesList, item => new(((RecentFile)item).CurrentPath, false));
         FileMenus.AttachTree(FolderTree);
         Deactivated += (_, _) => { if (!TestMode) ViewModel.Search.HideResults(); };
         AddHandler(System.Windows.Controls.Primitives.Thumb.DragCompletedEvent, new System.Windows.Controls.Primitives.DragCompletedEventHandler((sender, e) =>
         { if (e.OriginalSource is GridSplitter) SavePaneLayout(); }), true);
+    }
+    private void ToggleSingleClickPreview(object sender, RoutedEventArgs e)
+    {
+        if (!ViewModel.SingleClickPreview) FilePreview.Close();
+        ViewModel.Save();
     }
     private IndexManagementWindow? indexManagement;
     private void OpenIndexManagement(object sender, RoutedEventArgs e)
@@ -155,6 +160,7 @@ public partial class MainWindow : Window
         if (!e.Cancel) ViewModel.Dispose(); base.OnClosing(e);
     }
 }
+
 
 
 

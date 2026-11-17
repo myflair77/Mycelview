@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.IO;
 namespace Mycelview;
 // Shared bound for card and explorer metadata reads. Await UI previews to avoid flooding Dispatcher.
@@ -25,7 +25,7 @@ internal static class FolderListing
                     try
                     {
                         var folder = (item.Attributes & FileAttributes.Directory) != 0;
-                        items.Add(new(item.FullName, item.Name, folder, item.LastWriteTime, folder ? 0 : ((FileInfo)item).Length) { Created = item.CreationTime });
+                        items.Add(new(item.FullName, item.Name, folder, item.LastWriteTime, folder ? 0 : ((FileInfo)item).Length) { Created = item.CreationTime, Attributes = item.Attributes });
                     }
                     catch (IOException) { }
                     catch (UnauthorizedAccessException) { }

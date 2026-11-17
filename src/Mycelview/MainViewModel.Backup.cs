@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text.Json;
 
 namespace Mycelview;
@@ -12,6 +12,8 @@ public sealed partial class MainViewModel
         CaptureWorkspace();
         return new()
     {
+        ShowHiddenFiles = FileDisplayPreferences.Current.ShowHidden, ShowFileExtensions = FileDisplayPreferences.Current.ShowExtensions,
+        SingleClickPreview = SingleClickPreview, LauncherFavorites = LauncherFavorites.ToList(), LauncherGroupOrder = launcherGroupOrder.ToList(),
         SearchOptions = Search.Options.Copy(), Version = 2, Workspaces = Workspaces.ToList(), ActiveWorkspaceId = ActiveWorkspace?.Id ?? Guid.Empty,
         ExplorerCollapsed = ExplorerCollapsed, ExplorerWidth = ExplorerWidth, ExplorerTreeHeight = ExplorerTreeHeight, FavoritesWidth = FavoritesWidth, FavoritesRatio = FavoritesRatio,
         FolderColumns = FolderColumns,
@@ -63,6 +65,8 @@ public sealed partial class MainViewModel
     private async Task ApplyWorkspaceAsync(WorkspaceState state)
     {
         Search.HideResults();
+        LoadLauncherGroupOrder(state.LauncherGroupOrder);
+        LauncherFavorites.Clear(); foreach (var item in state.LauncherFavorites ?? []) if (item != null) LauncherFavorites.Add(item);
         foreach (var card in Cards) card.Dispose();
         Cards.Clear(); Folders.Clear(); Favorites.Clear(); RecentFiles.Clear();
         Enlargement = state.Enlargement ?? new();
@@ -76,5 +80,7 @@ public sealed partial class MainViewModel
         WorkspaceChanged?.Invoke();
     }
 }
+
+
 
 

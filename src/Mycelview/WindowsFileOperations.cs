@@ -1,8 +1,8 @@
-﻿using System.IO;
+using System.IO;
 using System.Runtime.InteropServices;
 
 namespace Mycelview;
-internal enum FileAction { Copy, Move, Rename, NewFolder, Recycle }
+internal enum FileAction { Copy, Move, Rename, NewFolder, Recycle, Delete }
 internal sealed record FileRequest(FileAction Action, string Source, string? Destination = null, string? Name = null);
 internal sealed record FileChange(FileRequest Request, string? NewPath);
 internal sealed record FileProgress(string Path, uint Total, uint Done);
@@ -65,6 +65,11 @@ internal static class WindowsFileOperations
             {
                 token.ThrowIfCancellationRequested();
                 foreach (var request in requests) FileOperationRules.Validate(request);
+                if(requests.Any(r=>r.Action==FileAction.Delete))
+                {
+                    if(requests.Any(r=>r.Action==FileAction.Recycle))throw new InvalidOperationException("삭제 방식을 혼합할 수 없습니다.");
+                    flags &= ~(0x0040u|0x00080000u|0x20000000u);
+                }
                 operation = (IFileOperationNative)Activator.CreateInstance(Type.GetTypeFromCLSID(new Guid("3AD05575-8857-4850-9277-11B85BDB8E09"))!)!;
                 Check(operation.SetOperationFlags(flags)); Check(operation.SetOwnerWindow(owner));
                 var sink = new FileProgressSink(requests, token, progress, diagnostic);
@@ -84,7 +89,7 @@ internal static class WindowsFileOperations
                         FileAction.Move => operation.MoveItem(source, Item(request.Destination!), request.Name, null),
                         FileAction.Rename => operation.RenameItem(source, request.Name!, null),
                         FileAction.NewFolder => operation.NewItem(source, 0x10, request.Name!, null, null),
-                        FileAction.Recycle => operation.DeleteItem(source, null),
+                        FileAction.Recycle or FileAction.Delete => operation.DeleteItem(source, null),
                         _ => throw new InvalidOperationException()
                     };
                     Check(result);
@@ -182,7 +187,7 @@ public sealed class FileProgressSink : IFileProgressNative
     internal void FinalizeCompleted(bool aborted)
     {
         // Shell folder callbacks may precede their children. Only finalize after PerformOperations.
-        Completed.RemoveAll(c => c.Request.Action == FileAction.Move && (File.Exists(c.Request.Source) || Directory.Exists(c.Request.Source)));
+        Completed.RemoveAll(c => c.Request.Action is FileAction.Move or FileAction.Delete && (File.Exists(c.Request.Source) || Directory.Exists(c.Request.Source)));
         if (aborted || Errors.Count > 0) Completed.RemoveAll(c => c.Request.Action == FileAction.Copy && folders.Contains(c.Request.Source));
     }
     private int Cancel => token.IsCancellationRequested ? unchecked((int)0x800704C7) : 0;
@@ -208,7 +213,7 @@ public sealed class FileProgressSink : IFileProgressNative
         if (path.Length == 0) return 0;
         var request = requests.FirstOrDefault(r => r.Action == action && FileOperationRules.Same(r.Source, path) && (action != FileAction.NewFolder || r.Name == name));
         // Optimized same-volume moves return COPYENGINE_S_DONT_PROCESS_CHILDREN (0x270008), not S_OK.
-        if (result >= 0 && created != null && request != null && !Completed.Any(x => x.Request == request)) Completed.Add(new(request, PathOf(created)));
+        if (result >= 0 && (created != null || action == FileAction.Delete) && request != null && !Completed.Any(x => x.Request == request)) Completed.Add(new(request, PathOf(created)));
         else if (result < 0 && Errors.Count < 100 && result != unchecked((int)0x800704C7)) Errors.Add($"{path}: {Marshal.GetExceptionForHR(result)?.Message}");
         return 0;
     }
@@ -228,7 +233,7 @@ public sealed class FileProgressSink : IFileProgressNative
         { Errors.Add("휴지통을 사용할 수 없어 중단했습니다. 영구 삭제하지 않았습니다."); return unchecked((int)0x80070032); }
         return result;
     }
-    public int PostDeleteItem(uint flags, IShellItemNative item, int result, IShellItemNative? created) => After(FileAction.Recycle, item, result, created);
+    public int PostDeleteItem(uint flags, IShellItemNative item, int result, IShellItemNative? created) => After(requests.Any(r=>r.Action==FileAction.Delete)?FileAction.Delete:FileAction.Recycle, item, result, created);
     public int PreNewItem(uint flags, IShellItemNative destination, string name) => Before(destination);
     public int PostNewItem(uint flags, IShellItemNative destination, string name, string? template, uint attributes, int result, IShellItemNative? created) => After(FileAction.NewFolder, destination, result, created, name);
     public int UpdateProgress(uint total, uint done)

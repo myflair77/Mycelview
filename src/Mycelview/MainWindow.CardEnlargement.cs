@@ -1,4 +1,4 @@
-﻿using System.Collections.Specialized;
+using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -28,6 +28,23 @@ public partial class MainWindow
         card.State.EnlargementPinned = !card.State.EnlargementPinned;
         automaticEnlargement = true;
         view.SetEnlargementIndicator(true); ViewModel.Changed(); ViewModel.Save();
+    }
+    private void ToggleAllFolderPinsClick(object sender, RoutedEventArgs e) => ToggleAllFolderPins();
+    internal void ToggleAllFolderPins()
+    {
+        var cards=ViewModel.Folders.ToArray();
+        if(cards.Length==0)return;
+        bool pin=!cards.All(c=>c.State.EnlargementPinned);
+
+        foreach(var card in cards)card.State.EnlargementPinned=pin;
+        void Refresh(DependencyObject parent)
+        {
+            if(parent is CardView view)view.SetEnlargementIndicator(IsCardEnlarged(view));
+            for(int i=0;i<VisualTreeHelper.GetChildrenCount(parent);i++)Refresh(VisualTreeHelper.GetChild(parent,i));
+        }
+        Refresh(FolderCards);
+        if(enlargedCard!=null){enlargedCard.SetEnlargementIndicator(true);automaticEnlargement=true;}
+        ViewModel.Changed();ViewModel.Save();
     }
     internal bool EnlargementStaysOpen => enlargedCard?.DataContext is CardViewModel { State.EnlargementPinned: true };
     internal void QueueCardEnlargement(CardView view)

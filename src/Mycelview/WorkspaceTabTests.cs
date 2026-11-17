@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -27,9 +27,9 @@ internal static class WorkspaceTabTests
             bool lastRejected = false; try { await vm.DeleteWorkspaceAsync(original.Id); } catch (InvalidOperationException) { lastRejected = true; }
             Check(lastRejected && vm.Workspaces.Count == 1, "Last workspace cannot be deleted.");
             vm.ToggleFolders.Execute(null);
-            Check(vm.Folders.All(x => x.State.Collapsed) && vm.ToggleFoldersLabel == "모두 펼치기", "First toggle collapses all and changes next action.");
+            Check(vm.Folders.All(x => x.State.Collapsed) && vm.ToggleFoldersLabel == "폴더 모두 펼치기", "First toggle collapses all and changes next action.");
             vm.ToggleFolders.Execute(null);
-            Check(vm.Folders.All(x => !x.State.Collapsed) && vm.ToggleFoldersLabel == "모두 접기", "Second toggle expands all.");
+            Check(vm.Folders.All(x => !x.State.Collapsed) && vm.ToggleFoldersLabel == "폴더 모두 접기", "Second toggle expands all.");
             vm.ToggleFolders.Execute(null);
             vm.FolderHeight = 460; vm.ShowModified = false; vm.FolderColumns = 5;
             vm.Folders[0].State.SortProperty = "Length"; vm.Folders[0].State.SortDescending = true;
@@ -38,10 +38,10 @@ internal static class WorkspaceTabTests
             bool nameRejected = false; try { await vm.CreateWorkspaceAsync("결산"); } catch (InvalidOperationException) { nameRejected = true; }
             Check(nameRejected && vm.Workspaces.Count == 2, "Duplicate workspace name is rejected.");
             Check(window.WorkspaceHint.Visibility == Visibility.Visible, "Add-workspace hint remains visible with multiple tabs.");
-            Check(vm.Cards.Count == 0 && vm.ToggleFoldersLabel == "모두 접기", "New workspace is independent and empty.");
+            Check(vm.Cards.Count == 0 && vm.ToggleFoldersLabel == "폴더 모두 접기", "New workspace is independent and empty.");
             vm.AddPath(folder); vm.AddPath(file); vm.Folders[0].Note = "결산 메모"; vm.FolderHeight = 300; vm.FolderColumns = 3;
             var duplicate = await vm.DuplicateWorkspaceAsync(original.Id);
-            Check(vm.Cards[0].Note == "기본 메모" && vm.FolderColumns == 5 && vm.FolderHeight == 460 && vm.ToggleFoldersLabel == "모두 펼치기", "Duplication preserves layout, note and toggle state.");
+            Check(vm.Cards[0].Note == "기본 메모" && vm.FolderColumns == 5 && vm.FolderHeight == 460 && vm.ToggleFoldersLabel == "폴더 모두 펼치기", "Duplication preserves layout, note and toggle state.");
             Check(duplicate.Cards.All(c => original.Cards.All(o => o.Id != c.Id)), "Duplicated cards have independent identities.");
             vm.Cards[0].Note = "복제 메모";
             Check(original.Cards[0].Note == "기본 메모", "Duplicated notes do not share mutable state.");
@@ -113,7 +113,7 @@ internal static class WorkspaceTabTests
             Check(vm.Cards[0].Note == "결산 메모" && vm.FolderColumns == 3 && vm.FolderHeight == 300, "Active tab data restored.");
             var first = vm.Workspaces.Single(x => x.Name == "기본 작업공간");
             await vm.SwitchWorkspaceAsync(first.Id);
-            Check(vm.Cards[0].Note == "기본 메모" && vm.ToggleFoldersLabel == "모두 펼치기" && vm.Folders[0].State.Collapsed && vm.FolderColumns == 5 && vm.FolderHeight == 460, "Inactive tab and next toggle action survive restart.");
+            Check(vm.Cards[0].Note == "기본 메모" && vm.ToggleFoldersLabel == "폴더 모두 펼치기" && vm.Folders[0].State.Collapsed && vm.FolderColumns == 5 && vm.FolderHeight == 460, "Inactive tab and next toggle action survive restart.");
             await vm.SwitchWorkspaceAsync(vm.Workspaces[0].Id);
         }
         finally { SkinManager.Apply(skin); TextScale.Apply(zoom); }

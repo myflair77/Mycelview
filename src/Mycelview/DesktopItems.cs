@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 namespace Mycelview;
@@ -49,7 +49,7 @@ internal static class DesktopItems
                         else if ((bool)entry.IsFileSystem)
                         {
                             FileSystemInfo info = (bool)entry.IsFolder ? new DirectoryInfo(path) : new FileInfo(path);
-                            if (info.Exists) result.Add(new(path, info.Name, info is DirectoryInfo, info.LastWriteTime, info is FileInfo file ? file.Length : 0) { Created = info.CreationTime });
+                            if (info.Exists) result.Add(new(path, info.Name, info is DirectoryInfo, info.LastWriteTime, info is FileInfo file ? file.Length : 0) { Created = info.CreationTime, Attributes = info.Attributes });
                         }
                     }
                     catch (Exception error) when (error is IOException or UnauthorizedAccessException or COMException) { }

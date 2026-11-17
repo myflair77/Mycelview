@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Interop;
@@ -10,7 +10,7 @@ namespace Mycelview;
 // Keep the Shell-owned HMENU intact: extensions can paint icons and lazily populate submenus.
 internal sealed class NativeShellMenu : IDisposable
 {
-    internal const uint First = 1, Last = 0x6fff, Preview = 0x7000, Reveal = 0x7001, Undo = 0x7002, Unregister = 0x7003, AddFolder = 0x7004, AddFile = 0x7005;
+    internal const uint First = 1, Last = 0x6fff, Preview = 0x7000, Reveal = 0x7001, Undo = 0x7002, Unregister = 0x7003, AddFolder = 0x7004, AddFile = 0x7005, OpenLocation = 0x7006;
     private object? array;
     private IContextMenu? context;
     private IntPtr logo;
@@ -57,6 +57,64 @@ internal sealed class NativeShellMenu : IDisposable
         finally { foreach (var pidl in pidls) Marshal.FreeCoTaskMem(pidl); }
     }
 
+    internal NativeShellMenu(string directory, IntPtr owner)
+    {
+        paths = [directory];
+        IntPtr pidl = IntPtr.Zero, pointer = IntPtr.Zero;
+        IShellFolder? desktop = null;
+        try
+        {
+            Marshal.ThrowExceptionForHR(SHParseDisplayName(directory, IntPtr.Zero, out pidl, 0, out _));
+            Marshal.ThrowExceptionForHR(SHGetDesktopFolder(out desktop));
+            var iid = typeof(IShellFolder).GUID;
+            desktop.BindToObject(pidl, IntPtr.Zero, ref iid, out pointer);
+            array = Marshal.GetObjectForIUnknown(pointer);
+            Marshal.Release(pointer); pointer = IntPtr.Zero;
+            iid = typeof(IContextMenu).GUID;
+            ((IShellFolder)array).CreateViewObject(owner, ref iid, out pointer);
+            context = (IContextMenu)Marshal.GetObjectForIUnknown(pointer);
+            Marshal.Release(pointer); pointer = IntPtr.Zero;
+            Menu = CreatePopupMenu();
+            if (Menu == IntPtr.Zero) throw new System.ComponentModel.Win32Exception();
+            Marshal.ThrowExceptionForHR(context.QueryContextMenu(Menu, 0, First, Last, 0));
+        }
+        catch { Dispose(); throw; }
+        finally
+        {
+            if (pointer != IntPtr.Zero) Marshal.Release(pointer);
+            if (pidl != IntPtr.Zero) Marshal.FreeCoTaskMem(pidl);
+            if (desktop != null) Marshal.ReleaseComObject(desktop);
+        }
+    }
+    internal void AddBackgroundItems()
+    {
+        logo = CreateLogo();
+        uint position = (uint)GetMenuItemCount(Menu);
+        InsertMenu(Menu, position++, 0x400 | 0x800, 0, null);
+        Insert(position++, AddFolder, "Mycelview · 폴더 즐겨찾기에 추가", true);
+        Insert(position, Reveal, "Windows 탐색기로 열기", true);
+    }
+    internal void AddHostCommand(uint id, string label, bool enabled = true)
+    {
+        InsertMenu(Menu, 0, 0x400u | (enabled ? 0u : 3u), id, label);
+    }
+    internal void AddHostSubmenu(string label, IEnumerable<(uint Id, string Label, bool Checked)> items)
+    {
+        var submenu = CreatePopupMenu();
+        try
+        {
+            foreach (var item in items)
+                if (!AppendMenu(submenu, item.Checked ? 8u : 0u, (UIntPtr)item.Id, item.Label))
+                    throw new System.ComponentModel.Win32Exception();
+            if (!InsertPopup(Menu, 0, 0x400u | 0x10u, (UIntPtr)submenu, label))
+                throw new System.ComponentModel.Win32Exception();
+        }
+        catch { DestroyMenu(submenu); throw; }
+    }
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "InsertMenuW")]
+    private static extern bool InsertPopup(IntPtr menu, uint position, uint flags, UIntPtr submenu, string text);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "AppendMenuW")]
+    private static extern bool AppendMenu(IntPtr menu, uint flags, UIntPtr id, string text);
     internal string Verb(uint id)
     {
         if (browserVerbs.TryGetValue(id, out var browserVerb)) return browserVerb;
@@ -102,17 +160,18 @@ internal sealed class NativeShellMenu : IDisposable
         }
         return entries;
     }
-    internal void AddMycelviewItems(bool filesOnly, bool single, bool canUndo, bool canUnregister)
+    internal void AddMycelviewItems(bool filesOnly, bool single, bool canUndo, bool canUnregister, bool searchResults = false)
     {
         logo = CreateLogo();
         var entries = Entries();
         int anchor = entries.FindIndex(e => e.Verb.Equals(filesOnly ? "open" : "opennewwindow", StringComparison.OrdinalIgnoreCase));
         if (anchor < 0) anchor = entries.FindIndex(e => e.Verb.Equals("open", StringComparison.OrdinalIgnoreCase));
         uint position = (uint)Math.Max(0, anchor + 1);
+        if (searchResults) Insert(position++, OpenLocation, "경로로 열기", true);
         if (filesOnly) Insert(position++, Preview, "미리보기\tSpace", single);
         if (paths.Any(System.IO.Directory.Exists)) Insert(position++, AddFolder, "폴더 즐겨찾기에 추가", true);
         if (paths.Any(System.IO.File.Exists)) Insert(position++, AddFile, "파일 즐겨찾기에 추가", true);
-        Insert(position, Reveal, "Windows 탐색기로 열기", true);
+        if (!searchResults) Insert(position, Reveal, "Windows 탐색기로 열기", true);
         entries = Entries();
         int cut = entries.FindIndex(e => e.Verb.Equals("cut", StringComparison.OrdinalIgnoreCase));
         position = cut < 0 ? (uint)entries.Count : (uint)cut;

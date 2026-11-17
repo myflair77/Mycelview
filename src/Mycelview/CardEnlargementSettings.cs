@@ -1,13 +1,13 @@
-﻿namespace Mycelview;
+namespace Mycelview;
 public sealed class CardEnlargementSettings
 {
-    public string Mode { get; set; } = "A";
+    public string Mode { get; set; } = "B";
     public bool FixedSize { get; set; } = true;
     public int Percent { get; set; } = 150;
     public int Width { get; set; } = 700;
     public int Height { get; set; } = 600;
     public int DelayMs { get; set; } = 350;
-    public CardEnlargementSettings Normalize() => new() { Mode = Mode is "A" or "B" or "C" ? Mode : "A", FixedSize = FixedSize, Percent = Math.Clamp(Percent,110,300), Width = Math.Clamp(Width,400,2400), Height = Math.Clamp(Height,260,1800), DelayMs = Math.Clamp(DelayMs,0,1500) };
+    public CardEnlargementSettings Normalize() => new() { Mode = Mode is "A" or "B" or "C" ? Mode : "B", FixedSize = FixedSize, Percent = Math.Clamp(Percent,110,300), Width = Math.Clamp(Width,400,2400), Height = Math.Clamp(Height,260,1800), DelayMs = Math.Clamp(DelayMs,0,1500) };
 }
 public sealed partial class MainViewModel
 {

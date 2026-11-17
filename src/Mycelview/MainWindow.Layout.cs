@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Input;
 
 namespace Mycelview;
@@ -60,6 +60,7 @@ public partial class MainWindow
     }
     internal void SavePaneLayout()
     {
+        if(fileSectionPush)return;
         var layout = ViewModel.Layout;
         if (!ViewModel.ExplorerCollapsed) ViewModel.ExplorerWidth = ExplorerColumn.ActualWidth; ViewModel.FavoritesWidth = FavoritesColumn.ActualWidth;
         if (!ViewModel.ExplorerCollapsed) ViewModel.ExplorerTreeHeight = ExplorerTreeRow.ActualHeight;

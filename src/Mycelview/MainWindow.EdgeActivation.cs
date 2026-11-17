@@ -1,18 +1,23 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 namespace Mycelview;
 public partial class MainWindow
 {
     private EdgeActivationService? edgeActivation;
-    private void ShowEdgeActivationSettings(object sender, RoutedEventArgs e)
+    private AppEdgeSwitcher? appEdgeSwitcher;
+    private void ShowEdgeActivationSettings(object sender, RoutedEventArgs e) => OpenEdgeActivationSettings();
+    private void OpenEdgeActivationSettings(LauncherFavorite? favorite = null) => CreateEdgeActivationDialog(favorite).ShowDialog();
+    internal Window CreateEdgeActivationDialog(LauncherFavorite? favorite = null)
     {
-        var saved = ViewModel.EdgeActivation;
-        var dialog = new Window { Owner = this, Icon = Icon, Title = "화면 가장자리 호출 설정", Width = 440, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var saved = ViewModel.EdgeActivation.Normalize();
+        if(favorite != null) LauncherEdgeSetup.Prepare(saved,favorite);
+        var dialog = new Window { Owner = this, Icon = Icon, Title = "화면 가장자리 호출 설정", Width = 540, Height = 630, SizeToContent = SizeToContent.Manual, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         dialog.SetResourceReference(BackgroundProperty, "SurfaceBrush"); dialog.SetResourceReference(ForegroundProperty, "TextBrush");
         var panel = new StackPanel { Margin = new Thickness(20) }; dialog.MaxHeight = Math.Max(300, SystemParameters.WorkArea.Height - 40); dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        var enabled = new CheckBox { Content = "화면 가장자리에서 Mycelview 표시", IsChecked = saved.Enabled }; panel.Children.Add(enabled);
+        var enabled = new CheckBox { Content = "화면 가장자리 호출 사용", IsChecked = saved.Enabled }; panel.Children.Add(enabled);
         void Label(string value) => panel.Children.Add(new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,12,0,5) });
+
         Label("작동 위치");
         string[] edges = ["Left", "Right", "Top", "Bottom"];
         var edge = new ComboBox { ItemsSource = new[] { "왼쪽", "오른쪽", "위쪽", "아래쪽" }, SelectedIndex = Array.IndexOf(edges, saved.Edge) }; panel.Children.Add(edge);
@@ -38,12 +43,14 @@ public partial class MainWindow
             segment.Width = vertical ? thickness : preview.Width * (end - start); segment.Height = vertical ? preview.Height * (end - start) : thickness;
             Canvas.SetLeft(segment, vertical ? (edge.SelectedIndex == 1 ? preview.Width - thickness : 0) : preview.Width * start);
             Canvas.SetTop(segment, vertical ? preview.Height * start : (edge.SelectedIndex == 3 ? preview.Height - thickness : 0));
-            rangeHint.Text = (vertical ? "슬라이더 왼쪽은 화면 위, 오른쪽은 화면 아래입니다." : "슬라이더는 화면의 왼쪽에서 오른쪽 방향입니다.") + $" 선택: {start:P0}~{end:P0}";
+            rangeHint.Text = $"반응 구간  {start:P0} ~ {end:P0}";
+            rangeStart.ToolTip=rangeEnd.ToolTip=vertical?"화면 위에서 아래 방향으로 시작·끝 위치를 조절합니다.":"화면 왼쪽에서 오른쪽 방향으로 시작·끝 위치를 조절합니다.";
         }
         rangeStart.ValueChanged += (_, _) => { if (adjustingRange) return; adjustingRange = true; if (rangeStart.Value >= rangeEnd.Value) rangeEnd.Value = rangeStart.Value + 1; adjustingRange = false; UpdateRange(); };
         rangeEnd.ValueChanged += (_, _) => { if (adjustingRange) return; adjustingRange = true; if (rangeEnd.Value <= rangeStart.Value) rangeStart.Value = rangeEnd.Value - 1; adjustingRange = false; UpdateRange(); };
         edge.SelectionChanged += (_, _) => UpdateRange(); rangeMode.SelectionChanged += (_, _) => UpdateRange(); UpdateRange();
-        Label("파란 표시 두께 (2~30px · 기본 10px)");
+        int commonStart=panel.Children.Count;
+        Label("표시 두께");
         var thicknessRow = new StackPanel { Orientation = Orientation.Horizontal };
         var thicknessValue = new TextBlock { Width = 70, VerticalAlignment = VerticalAlignment.Center, TextAlignment = TextAlignment.Center };
         var thicknessDown = new Button { Content = "▼", ToolTip = "1px 감소" };
@@ -59,7 +66,7 @@ public partial class MainWindow
         }
         thicknessDown.Click += (_, _) => ChangeThickness(-1); thicknessUp.Click += (_, _) => ChangeThickness(1);
         thicknessRow.Children.Add(thicknessDown); thicknessRow.Children.Add(thicknessValue); thicknessRow.Children.Add(thicknessUp); panel.Children.Add(thicknessRow); ChangeThickness(0);
-        Label("대기 시간 (초 · 0.1~5 · 0.1초씩 조절)");
+        Label("대기 시간");
         int delayMs = saved.DelayMs;
         var delayRow = new StackPanel { Orientation = Orientation.Horizontal };
         var delay = new TextBox { Text = (delayMs / 1000.0).ToString("0.0", CultureInfo.CurrentCulture), IsReadOnly = true, Width = 90, VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "위·아래 화살표로 대기 시간 조절" };
@@ -77,7 +84,8 @@ public partial class MainWindow
         increase.Click += (_, _) => UpdateDelay(100); decrease.Click += (_, _) => UpdateDelay(-100);
         delay.PreviewKeyDown += (_, key) => { if (key.Key is System.Windows.Input.Key.Up or System.Windows.Input.Key.Down) { UpdateDelay(key.Key == System.Windows.Input.Key.Up ? 100 : -100); key.Handled = true; } };
         arrows.Children.Add(increase); arrows.Children.Add(decrease); delayRow.Children.Add(delay); delayRow.Children.Add(arrows); panel.Children.Add(delayRow); UpdateDelay(0);
-        Label("작동 모니터");
+        int monitorStart=panel.Children.Count;
+        Label("모니터");
         var monitor = new ComboBox { DisplayMemberPath = "Value", SelectedValuePath = "Key" }; panel.Children.Add(monitor);
         void UpdateMonitors()
         {
@@ -90,7 +98,10 @@ public partial class MainWindow
             monitor.ItemsSource = choices; monitor.SelectedValue = selected;
         }
         edge.SelectionChanged += (_, _) => UpdateMonitors(); UpdateMonitors();
-        Label("반응 구간은 은은한 파란색으로 표시됩니다. 기본값: 가장 왼쪽 모니터의 왼쪽 경계 아래쪽 절반(50~100%)에서 0.2초 대기. 마우스를 경계에서 떼었다가 다시 가져가면 재호출합니다. 파일을 드래그하는 동안에는 호출하지 않습니다.");
+        int helpStart=panel.Children.Count;
+        int appStart=panel.Children.Count;
+        var appZones = AddAppZoneEditor(panel, saved);
+        int appEnd=panel.Children.Count;
         var error = new TextBlock { TextWrapping = TextWrapping.Wrap }; panel.Children.Add(error);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0,12,0,0) }; panel.Children.Add(buttons);
         buttons.Children.Add(new Button { Content = "취소", IsCancel = true }); var save = new Button { Content = "저장", IsDefault = true }; buttons.Children.Add(save);
@@ -98,12 +109,47 @@ public partial class MainWindow
         {
             int start = rangeMode.SelectedIndex == 0 ? 0 : (int)Math.Round(rangeStart.Value);
             int end = rangeMode.SelectedIndex == 0 ? 100 : (int)Math.Round(rangeEnd.Value);
+            if (!ValidateAppZones(appZones, out var zoneError)) { error.Text=zoneError; return; }
             var previous = ViewModel.EdgeActivation;
-            ViewModel.EdgeActivation = new() { Enabled = enabled.IsChecked == true, Edge = edges[Math.Max(0, edge.SelectedIndex)], DelayMs = delayMs, ThicknessPixels = thicknessPixels, StartPercent = start, EndPercent = end, Monitor = (string?)monitor.SelectedValue ?? "Automatic" };
+            ViewModel.EdgeActivation = new() { AppZones = appZones, Enabled = enabled.IsChecked == true, Edge = edges[Math.Max(0, edge.SelectedIndex)], DelayMs = delayMs, ThicknessPixels = thicknessPixels, StartPercent = start, EndPercent = end, Monitor = (string?)monitor.SelectedValue ?? "Automatic" };
             if (!ViewModel.Save()) { ViewModel.EdgeActivation = previous; error.Text = "설정을 저장하지 못했습니다. 다시 시도하세요."; return; }
             dialog.DialogResult = true;
         };
         DismissSettingsOnOutsideClick.Attach(dialog);
-        dialog.ShowDialog();
+        var children=panel.Children.Cast<UIElement>().ToList();
+        panel.Children.Clear();
+        var basic=new StackPanel();
+        foreach(var child in children.Skip(1).Take(commonStart-1).Concat(children.Skip(monitorStart).Take(helpStart-monitorStart)))basic.Children.Add(child);
+        var common=new StackPanel();
+        foreach(var child in children.Skip(commonStart).Take(monitorStart-commonStart))common.Children.Add(child);
+        var apps=new StackPanel();
+        foreach(var child in children.Skip(appStart).Take(appEnd-appStart))apps.Children.Add(child);
+        var tabs=new TabControl{Margin=new Thickness(0,12,0,0)};
+        void Tab(string title,StackPanel content,string hint){
+            tabs.Items.Add(new TabItem{Header=title,ToolTip=hint,Content=new ScrollViewer{Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,Padding=new Thickness(12,6,12,10)}});
+        }
+        Tab("Mycelview 호출",basic,"화면 가장자리에서 Mycelview 창을 앞으로 가져올 위치를 지정합니다.");
+        Tab("앱별 창 선택",apps,"앱마다 반응 구간을 지정하고 열린 창의 미리보기에서 전환합니다. 한 창의 탭은 하나로 취급합니다.");
+        Tab("반응 설정",common,"Mycelview 호출과 앱별 창 선택에 공통으로 적용됩니다.");
+        tabs.SelectedIndex=favorite==null?0:1;
+        var root=new DockPanel{Margin=new Thickness(18)};
+        DockPanel.SetDock(enabled,Dock.Top);root.Children.Add(enabled);
+        DockPanel.SetDock(buttons,Dock.Bottom);root.Children.Add(buttons);
+        DockPanel.SetDock(error,Dock.Bottom);root.Children.Add(error);
+        root.Children.Add(tabs);dialog.Content=root;
+        dialog.SetResourceReference(FontSizeProperty,"FontSize11");
+        enabled.ToolTip="전체 가장자리 호출 기능을 켜거나 끕니다. 파일을 드래그하는 동안에는 반응하지 않습니다.";
+        edge.ToolTip="마우스를 둘 화면 가장자리를 선택합니다.";
+        rangeMode.ToolTip="전체 경계 또는 슬라이더로 지정한 일부 구간에서만 반응하도록 설정합니다.";
+        monitor.ToolTip="자동 선택은 방향에 따라 가장 왼쪽·오른쪽·위쪽·아래쪽 모니터를 사용합니다.";
+        preview.ToolTip="파란 부분이 현재 선택한 반응 구간입니다.";
+        thicknessValue.ToolTip=thicknessRow.ToolTip="2~30px, 1px씩 조절합니다. 기본값은 10px입니다.";
+        delay.ToolTip=delayRow.ToolTip="가장자리에 머무르는 시간입니다. 0.1~5초, 0.1초씩 조절하며 기본값은 0.1초입니다.";
+        return dialog;
     }
 }
+
+
+
+
+

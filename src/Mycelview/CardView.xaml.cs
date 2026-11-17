@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -26,6 +26,7 @@ public partial class CardView : UserControl
     public CardView()
     {
         InitializeComponent();
+        _ = new FolderViewModes(FileList);
         InitializeColumnWidths();
         InitializeInlineRename();
         FileList.SelectionChanged += (_, _) => { if (!restoringScroll && IsLoaded && DataContext is CardViewModel card) card.SelectedPaths = FileList.SelectedItems.OfType<FileEntry>().Select(x => x.FullPath).ToHashSet(StringComparer.OrdinalIgnoreCase); };
@@ -46,6 +47,7 @@ public partial class CardView : UserControl
             if (!contextMenusAttached)
             {
                 Host.FileMenus.AttachGrid(FileList, entry => Card.OpenEntry(entry), () => Card.CurrentPath);
+                if (FolderViewModes.For(FileList) is {} views) Host.FileMenus.AttachList(views.Icons, item => { var entry=(FileEntry)item; return new(entry.FullPath,entry.IsDirectory); }, () => Card.CurrentPath, FileList);
                 Host.FileMenus.AttachHeader(CardHeader, () => Card);
                 contextMenusAttached = true;
             }
@@ -138,6 +140,7 @@ public partial class CardView : UserControl
         var property = Card.State.SortProperty is "Name" or "Modified" or "Length" or "Type" or "Created" or "Extension" ? Card.State.SortProperty : "Name";
         var view = CollectionViewSource.GetDefaultView(FileList.ItemsSource);
         if (view is ListCollectionView list) list.CustomSort = new FileEntryComparer(property, Card.State.SortDescending);
+        FolderViewModes.For(FileList)?.ApplyGrouping();
         foreach (var column in FileList.Columns) column.SortDirection = column.SortMemberPath == property ? direction : null;
     }
     private void ListLoaded(object sender, RoutedEventArgs e)
@@ -147,14 +150,21 @@ public partial class CardView : UserControl
     private void HeaderHoverLeave(object sender, MouseEventArgs e) => (Window.GetWindow(this) as MainWindow)?.CancelQueuedEnlargement(this);
     internal void SetEnlargementIndicator(bool enlarged)
     {
-        EnlargeHotspotIcon.Data=Geometry.Parse(enlarged
-            ? "M1,1 L6,6 M2,6 L6,6 L6,2 M15,15 L10,10 M14,10 L10,10 L10,14 M15,1 L10,6 M14,6 L10,6 L10,2 M1,15 L6,10 M2,10 L6,10 L6,14"
-            : "M6,6 L1,1 M1,5 L1,1 L5,1 M10,10 L15,15 M11,15 L15,15 L15,11 M10,6 L15,1 M11,1 L15,1 L15,5 M6,10 L1,15 M1,11 L1,15 L5,15");
+        ShrinkCardButton.Visibility = enlarged ? Visibility.Visible : Visibility.Collapsed;
+        EnlargeHotspotIcon.Visibility = enlarged ? Visibility.Collapsed : Visibility.Visible;
+        if (enlarged) EnlargeHotspot.Background = Brushes.Transparent;
+        else EnlargeHotspot.SetResourceReference(Border.BackgroundProperty, "SelectionBrush");
+        EnlargementPin.Width = enlarged ? 16 : 8;
+        EnlargementPin.Height = enlarged ? 20 : 10;
+        EnlargementPin.HorizontalAlignment = enlarged ? HorizontalAlignment.Center : HorizontalAlignment.Right;
+        EnlargementPin.VerticalAlignment = enlarged ? VerticalAlignment.Center : VerticalAlignment.Top;
+        EnlargementPin.Margin = enlarged ? new Thickness(0) : new Thickness(0, 1, 1, 0);
         bool pinned = Card.State.EnlargementPinned;
         EnlargementPin.Visibility = Visibility.Visible;
         EnlargementPin.Opacity = pinned ? 1 : .25;
         EnlargeHotspot.ToolTip = enlarged ? (pinned ? "확대 고정 중 · 클릭하면 핀 해제 · Esc로 닫기" : "클릭하면 확대 고정 · 카드 밖으로 나가면 닫기 · Esc로 닫기") : "이 영역에 마우스를 올리면 카드가 확대됩니다";
     }
+    private void ShrinkCardClick(object sender, RoutedEventArgs e) { Host.CloseCardEnlargement(); e.Handled=true; }
     private void EnlargementPinClick(object sender, MouseButtonEventArgs e)
     {
         if (Host.IsCardEnlarged(this)) { Host.ToggleEnlargementPin(this); e.Handled = true; }

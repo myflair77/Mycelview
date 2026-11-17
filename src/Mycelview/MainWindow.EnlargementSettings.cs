@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 namespace Mycelview;
 public partial class MainWindow
@@ -11,7 +11,7 @@ public partial class MainWindow
         dialog.SetResourceReference(BackgroundProperty,"SurfaceBrush");dialog.SetResourceReference(ForegroundProperty,"TextBrush");dialog.SetResourceReference(FontSizeProperty,"FontSize12");
         var panel=new StackPanel { Margin=new Thickness(20) };dialog.MaxHeight=SystemParameters.WorkArea.Height-40;dialog.Content=new ScrollViewer { Content=panel, VerticalScrollBarVisibility=ScrollBarVisibility.Auto };
         void Label(string value)=>panel.Children.Add(new TextBlock {Text=value,Margin=new Thickness(0,10,0,5),TextWrapping=TextWrapping.Wrap});
-        Label("카드 우측 상단의 확대 반응 영역에 마우스를 올리면 확대합니다. 카드 밖으로 나가면 닫힙니다.");
+        Label("폴더 카드·파일 즐겨찾기·최근 연 파일에 함께 적용됩니다. 각 영역의 우측 상단에 마우스를 올리면 확대하고, 핀이 꺼져 있으면 영역 밖으로 나갈 때 닫힙니다.");
         Label("확대 방식");
         var mode=new ComboBox {ItemsSource=new[]{"떠오르는 확대","밀어내는 확대","확대 안함"},SelectedIndex=saved.Mode=="B"?1:saved.Mode=="C"?2:0};panel.Children.Add(mode);
         Label("확대 정도");
@@ -21,7 +21,7 @@ public partial class MainWindow
         var width=new TextBox {Text=saved.Width.ToString(),Width=110};var height=new TextBox {Text=saved.Height.ToString(),Width=110};
         Label("너비 × 높이 (400~2400 × 260~1800)"); dimensions.Children.Add(width);dimensions.Children.Add(new TextBlock {Text=" × ",VerticalAlignment=VerticalAlignment.Center});dimensions.Children.Add(height);panel.Children.Add(dimensions);
 
-        Label("설정한 너비가 원래 폴더 카드보다 작으면 원래 카드 너비로 표시합니다.");
+        Label("설정한 너비가 원래 카드나 파일 목록보다 작으면 원래 영역 너비로 표시합니다.");
         Label("창이나 작업공간보다 큰 크기는 표시 가능한 범위로 제한합니다. 파일 드래그 중에는 자동 확대하지 않습니다.");
         void EnableFields() {bool enabled=mode.SelectedIndex!=2;sizeMode.IsEnabled=enabled;percent.IsEnabled=enabled&&fixedOption.IsChecked!=true;dimensions.IsEnabled=enabled; width.IsEnabled=height.IsEnabled=enabled&&fixedOption.IsChecked==true;}
         mode.SelectionChanged+=(_,_)=>Dispatcher.BeginInvoke(new Action(EnableFields));ratioOption.Checked+=(_,_)=>EnableFields();fixedOption.Checked+=(_,_)=>EnableFields();EnableFields();

@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -35,7 +35,7 @@ internal static class CardFileDragTests
             var payload = Payload();
             var data = payload.ToData();
             var effects = DragDropEffects.Move | DragDropEffects.Copy;
-            Check(!data.GetDataPresent(DataFormats.FileDrop), "Internal transfer payload must not become a registration/external move.");
+            Check(data.GetDataPresent(DataFormats.FileDrop), "Card transfers must also expose Windows FileDrop for external Explorer targets.");
             Check(payload.Effect(destinationCard.State.Id, destination, DragDropKeyStates.None, effects, false) == DragDropEffects.Move, "Normal drag must move.");
             Check(payload.Effect(destinationCard.State.Id, destination, DragDropKeyStates.ControlKey, effects, false) == DragDropEffects.Copy, "Ctrl drag must copy.");
             Check(payload.Effect(sourceCard.State.Id, source, DragDropKeyStates.None, effects, false) == DragDropEffects.None, "Same-card drop must be rejected.");

@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
@@ -19,7 +19,9 @@ internal sealed class FileContextMenus(MainViewModel vm)
     internal Action<IEnumerable<string>, bool> CopyFiles { get; set; } = vm.FileTasks.PutClipboard;
     internal Func<string, Task> PasteFiles { get; set; } = vm.FileTasks.PasteAsync;
 
+    private static readonly DependencyProperty SearchResultsProperty = DependencyProperty.RegisterAttached("SearchResults", typeof(bool), typeof(FileContextMenus), new PropertyMetadata(false));
     private sealed record NativeRequest(ContextTarget[] Selected);
+    private sealed record BackgroundRequest(string Directory);
     internal ContextMenu Build(ContextTarget[] selected, Action? openSingle = null, string? directory = null)
     {
         var menu = new ContextMenu();
@@ -29,8 +31,27 @@ internal sealed class FileContextMenus(MainViewModel vm)
             open.Click += (_, _) => { foreach (var item in selected) OpenPath(item.Path); };
             menu.Items.Add(open); return menu;
         }
-        if (selected.Length == 0) AppendManagement(menu, [], directory);
+        if (selected.Any(x => !System.IO.File.Exists(x.Path) && !System.IO.Directory.Exists(x.Path))) return BuildUnavailable(selected);
+        if (selected.Length == 0) { if (System.IO.Directory.Exists(directory)) menu.Tag = new BackgroundRequest(directory!); else AppendManagement(menu, [], directory); }
         else menu.Tag = new NativeRequest(selected.DistinctBy(x => x.Path, StringComparer.OrdinalIgnoreCase).ToArray());
+        return menu;
+    }
+    internal ContextMenu BuildUnavailable(ContextTarget[] selected)
+    {
+        var menu=new ContextMenu();
+        menu.Items.Add(new MenuItem {Header="원본 경로를 찾을 수 없거나 접근할 수 없습니다",IsEnabled=false});
+        void Add(string label,Action action){var item=new MenuItem{Header=label};item.Click+=(_,_)=>{try{action();}catch(Exception error){vm.Status=error.Message;}};menu.Items.Add(item);}
+        Add("저장된 경로 복사",()=>CopyText(string.Join(Environment.NewLine,selected.Select(x=>x.Path))));
+        var registrations=vm.Cards.Where(c=>selected.Any(x=>x.Registration==c || string.Equals(c.CurrentPath,x.Path,StringComparison.OrdinalIgnoreCase) || string.Equals(c.State.InitialPath,x.Path,StringComparison.OrdinalIgnoreCase))).ToArray();
+        if(registrations.Length==1)
+            Add("경로 재연결…",()=>
+            {
+                var card=registrations[0];
+                if(card.IsFolder){var dialog=new Microsoft.Win32.OpenFolderDialog {Title="폴더 다시 연결"};if(dialog.ShowDialog()==true)card.Reconnect(dialog.FolderName);}
+                else {var dialog=new Microsoft.Win32.OpenFileDialog{Title="파일 다시 연결",FileName=System.IO.Path.GetFileName(card.CurrentPath)};if(dialog.ShowDialog()==true)card.Reconnect(dialog.FileName);}
+                vm.Save();
+            });
+        if(registrations.Length>0)Add("즐겨찾기 등록 해제 (원본 유지)",()=>{foreach(var card in registrations)vm.Remove(card);});
         return menu;
     }
     private async void ShowNative(FrameworkElement owner, ContextTarget[] selected, bool keyboard)
@@ -45,7 +66,7 @@ internal sealed class FileContextMenus(MainViewModel vm)
             using (var menu = new NativeShellMenu(paths, hwnd))
             {
                 menu.AddMycelviewItems(selected.All(x => !x.Folder), selected.Length == 1,
-                    vm.FileTasks.CanUndo && !vm.FileTasks.Busy, registrations.Length > 0);
+                    vm.FileTasks.CanUndo && !vm.FileTasks.Busy, registrations.Length > 0, (bool)owner.GetValue(SearchResultsProperty));
                 command = menu.Track(owner, keyboard);
                 verb = menu.Verb(command).ToLowerInvariant();
                 if (command == 0) return;
@@ -57,7 +78,26 @@ internal sealed class FileContextMenus(MainViewModel vm)
             }
             await ExecuteMycelviewCommandAsync(command, verb, selected);
         }
-        catch (Exception error) { vm.Status = "Windows 메뉴 실행 실패: " + error.Message; }
+        catch (Exception error) { vm.Status = "Windows 메뉴 실행 실패: " + error.Message; Show(owner, BuildUnavailable(selected), keyboard); }
+    }
+    private async void ShowBackground(FrameworkElement owner, string directory, bool keyboard)
+    {
+        try
+        {
+            var hwnd = new System.Windows.Interop.WindowInteropHelper(Window.GetWindow(owner)).Handle;
+            using var menu = new NativeShellMenu(directory, hwnd);
+            menu.AddBackgroundItems();
+            var hostCommands = FolderBackgroundCommands.Build(menu, owner as DataGrid, directory, vm);
+            var command = menu.Track(owner, keyboard);
+            if (command == 0) return;
+            if (hostCommands.TryGetValue(command, out var action)) { await action(); return; }
+            if (command == NativeShellMenu.AddFolder) vm.AddPath(directory);
+            else if (command == NativeShellMenu.Reveal) OpenPath(directory);
+            else if (menu.Verb(command).Equals("paste", StringComparison.OrdinalIgnoreCase))
+                await PasteFiles(directory);
+            else menu.Invoke(command, hwnd);
+        }
+        catch (Exception error) { vm.Status = "Windows 폴더 메뉴 실행 실패: " + error.Message; }
     }
     internal async Task ExecuteMycelviewCommandAsync(uint command, string verb, ContextTarget[] selected)
     {
@@ -67,6 +107,9 @@ internal sealed class FileContextMenus(MainViewModel vm)
             switch (command)
             {
                 case NativeShellMenu.Preview: if (selected.Length == 1 && !selected[0].Folder) PreviewPath?.Invoke(paths[0]); break;
+                case NativeShellMenu.OpenLocation:
+                    foreach (var path in paths.Distinct(StringComparer.OrdinalIgnoreCase)) RevealPath(path);
+                    break;
                 case NativeShellMenu.Reveal:
                     foreach (var item in selected) { if (item.Folder) OpenPath(item.Path); else RevealPath(item.Path); }
                     break;
@@ -118,34 +161,42 @@ internal sealed class FileContextMenus(MainViewModel vm)
             Add("recycle", "휴지통으로 이동…" + suffix, () => vm.FileTasks.RecycleAsync(paths));
         }
     }
+    private async Task ExecuteClipboardAsync(ICommand command, Func<string[]> selection, Func<string?> destination)
+    {
+        if (vm.FileTasks.Busy) return;
+        try
+        {
+            if (command == ApplicationCommands.Paste)
+            {
+                var folder = destination();
+                if (string.IsNullOrEmpty(folder)) vm.Status = "붙여넣을 폴더 또는 같은 폴더의 파일을 선택하세요.";
+                else await PasteFiles(folder);
+            }
+            else CopyFiles(selection(), command == ApplicationCommands.Cut);
+        }
+        catch (Exception error) { vm.Status = "파일 작업 실패: " + error.Message; }
+    }
     private void AttachKeys(FrameworkElement owner, Func<string[]> selection, Func<string?> destination)
     {
         bool Editing(object? source) => Parent<TextBoxBase>(source as DependencyObject) != null || Parent<PasswordBox>(source as DependencyObject) != null;
         // WPF controls and IMEs can route clipboard shortcuts as commands instead of ordinary KeyDown events.
         foreach (var command in new[] { ApplicationCommands.Copy, ApplicationCommands.Cut, ApplicationCommands.Paste })
         {
-            owner.CommandBindings.Add(new CommandBinding(command, async (_, e) =>
+            owner.AddHandler(CommandManager.PreviewExecutedEvent, new ExecutedRoutedEventHandler(async (_, e) =>
             {
+                if (e.Command != command) return;
                 if (Editing(e.OriginalSource)) return;
                 e.Handled = true;
                 if (vm.FileTasks.Busy) return;
-                try
-                {
-                    if (command == ApplicationCommands.Paste)
-                    {
-                        var folder = destination();
-                        if (string.IsNullOrEmpty(folder)) vm.Status = "붙여넣을 폴더 또는 같은 폴더의 파일을 선택하세요.";
-                        else await PasteFiles(folder);
-                    }
-                    else CopyFiles(selection(), command == ApplicationCommands.Cut);
-                }
-                catch (Exception error) { vm.Status = "파일 작업 실패: " + error.Message; }
-            }, (_, e) =>
+                await ExecuteClipboardAsync(command, selection, destination);
+            }), true);
+            owner.AddHandler(CommandManager.PreviewCanExecuteEvent, new CanExecuteRoutedEventHandler((_, e) =>
             {
+                if (e.Command != command) return;
                 if (Editing(e.OriginalSource)) return;
                 e.CanExecute = !vm.FileTasks.Busy && (command == ApplicationCommands.Paste || selection().Length > 0);
                 e.Handled = true;
-            }));
+            }), true);
         }
         owner.PreviewKeyDown += async (_, e) =>
         {
@@ -155,10 +206,27 @@ internal sealed class FileContextMenus(MainViewModel vm)
             {
                 var command = key == Key.C ? ApplicationCommands.Copy : key == Key.X ? ApplicationCommands.Cut : ApplicationCommands.Paste;
                 e.Handled = true;
-                if (command.CanExecute(null, owner)) command.Execute(null, owner);
+                // Execute on the selected file control directly. Reparented floating
+                // cards can lose WPF's routed-command target despite CanExecute=true.
+                await ExecuteClipboardAsync(command, selection, destination);
                 return;
             }
             var keys = Keyboard.Modifiers; var paths = selection(); var folder = destination();
+            if ((key == Key.F5 && keys == ModifierKeys.None) || (key == Key.Back && keys == ModifierKeys.None && owner.DataContext is CardViewModel { IsFolder:true }) || (keys == ModifierKeys.Alt && key is Key.Left or Key.Right or Key.Up))
+            {
+                e.Handled=true;
+                if(owner.DataContext is CardViewModel card)
+                    (key==Key.F5?card.Reload:key==Key.Left?card.Back:key==Key.Right?card.Forward:card.Up).Execute(null);
+                else if(folder!=null)
+                {
+                    if(key==Key.F5)await vm.Explorer.NavigateAsync(vm.Explorer.CurrentPath);
+                    else if(key==Key.Left)await vm.Explorer.BackAsync();
+                    else if(key==Key.Right)await vm.Explorer.ForwardAsync();
+                    else await vm.Explorer.UpAsync();
+                }
+                else if(key==Key.F5 && owner is DataGrid)await vm.Search.RunAsync();
+                return;
+            }
             try
             {
                 if (keys == ModifierKeys.Control && e.Key == Key.Y) { e.Handled = true; await vm.FileTasks.RedoAsync(); }
@@ -167,7 +235,14 @@ internal sealed class FileContextMenus(MainViewModel vm)
                 else if (keys == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.N && !string.IsNullOrEmpty(folder))
                 { e.Handled = true; await vm.FileTasks.NewFolderAsync(folder); }
                 else if (keys == ModifierKeys.None && e.Key == Key.F2 && paths.Length > 0)
-                { e.Handled = true; await vm.FileTasks.RenameAsync(paths); }
+                {
+                    e.Handled = true;
+                    if(owner is ListBox iconList && iconList.SelectedItems.Count==1 && iconList.SelectedItem is FileEntry entry && Parent<CardView>(owner) is {} cardView)
+                        cardView.BeginInlineRename(entry);
+                    else await vm.FileTasks.RenameAsync(paths);
+                }
+                else if (keys == ModifierKeys.Shift && key == Key.Delete && paths.Length > 0)
+                { e.Handled = true; await vm.FileTasks.DeletePermanentlyAsync(paths); }
                 else if (keys == ModifierKeys.None && e.Key == Key.Delete && paths.Length > 0)
                 { e.Handled = true; await vm.FileTasks.RecycleAsync(paths); }
             }
@@ -187,13 +262,42 @@ internal sealed class FileContextMenus(MainViewModel vm)
     { if (!selection.Contains(item)) { selection.Clear(); selection.Add(item); } }
     private void Show(FrameworkElement owner, ContextMenu menu, bool keyboard)
     {
+        if (menu.Tag is BackgroundRequest background) { ShowBackground(owner, background.Directory, keyboard); return; }
         if (menu.Tag is NativeRequest request) { ShowNative(owner, request.Selected, keyboard); return; }
         if (menu.Items.Count == 0) return;
         menu.PlacementTarget = owner; menu.Placement = keyboard ? PlacementMode.Bottom : PlacementMode.MousePoint;
         menu.IsOpen = true;
     }
+    internal void PreviewSingleClick(ContextTarget selected)
+    {
+        if (!vm.SingleClickPreview || selected.Folder || DesktopItems.IsShellPath(selected.Path)) return;
+        if (PreviewIsOpen?.Invoke() == true) UpdatePreview?.Invoke(selected.Path);
+        else PreviewPath?.Invoke(selected.Path);
+    }
     private void AttachPreview(Selector selector, Func<object, ContextTarget> target)
     {
+        object? pressed = null; Point start = default;
+        object? ItemAt(DependencyObject? source) => selector is DataGrid
+            ? Parent<DataGridRow>(source)?.Item : Parent<ListBoxItem>(source)?.DataContext;
+        selector.AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            pressed = null;
+            if (e.ChangedButton != MouseButton.Left || e.ClickCount != 1 || Keyboard.Modifiers != ModifierKeys.None) return;
+            var source = e.OriginalSource as DependencyObject;
+            if (Parent<TextBoxBase>(source) != null || Parent<ButtonBase>(source) != null) return;
+            if (Parent<FrameworkElement>(source)?.Cursor == Cursors.SizeAll) return;
+            pressed = ItemAt(source); start = e.GetPosition(selector);
+        }), true);
+        selector.AddHandler(Mouse.MouseUpEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            var item = pressed; pressed = null;
+            if (e.ChangedButton != MouseButton.Left || item == null || !Equals(item, ItemAt(e.OriginalSource as DependencyObject)) || Keyboard.Modifiers != ModifierKeys.None) return;
+            var delta = e.GetPosition(selector) - start;
+            int count = selector is DataGrid grid ? grid.SelectedItems.Count : selector is ListBox list ? list.SelectedItems.Count : 0;
+            if (count != 1 || Math.Abs(delta.X) >= SystemParameters.MinimumHorizontalDragDistance || Math.Abs(delta.Y) >= SystemParameters.MinimumVerticalDragDistance) return;
+            PreviewSingleClick(target(item));
+        }), true);
+        selector.Unloaded += (_, _) => pressed = null;
         selector.PreviewKeyDown += (_, e) =>
         {
             if (e.Key == Key.Escape && PreviewIsOpen?.Invoke() == true) { e.Handled = true; ClosePreview?.Invoke(); return; }
@@ -210,11 +314,26 @@ internal sealed class FileContextMenus(MainViewModel vm)
             UpdatePreview?.Invoke(selected is { Folder: false } && !DesktopItems.IsShellPath(selected.Path) ? selected.Path : null);
         };
     }
-    internal void AttachGrid(DataGrid grid, Action<FileEntry>? singleOpen = null, Func<string?>? directory = null)
+    internal void AttachGrid(DataGrid grid, Action<FileEntry>? singleOpen = null, Func<string?>? directory = null, bool searchResults = false)
     {
+        grid.SetResourceReference(DataGrid.RowStyleProperty, typeof(DataGridRow));
+        _ = new FileMarqueeSelection(grid);
+        grid.SetValue(SearchResultsProperty, searchResults);
+        void ApplyDisplay(){if(grid.ItemsSource!=null)FileDisplayPreferences.Current.Watch(System.Windows.Data.CollectionViewSource.GetDefaultView(grid.ItemsSource));}
+        grid.Loaded+=(_,_)=>ApplyDisplay();
+        ApplyDisplay();
         AttachPreview(grid, item => { var entry = (FileEntry)item; return new(entry.FullPath, entry.IsDirectory); });
         ContextMenu Menu() { var entries = grid.SelectedItems.Cast<FileEntry>().ToArray(); return Build(entries.Select(x => new ContextTarget(x.FullPath, x.IsDirectory)).ToArray(), entries.Length == 1 && singleOpen != null ? () => singleOpen(entries[0]) : null, directory?.Invoke()); }
         AttachKeys(grid, () => grid.SelectedItems.Cast<FileEntry>().Where(x => !x.IsShellItem).Select(x => x.FullPath).ToArray(), () => directory?.Invoke() ?? PasteDestination(grid.SelectedItems.Cast<FileEntry>().Where(x => !x.IsShellItem).Select(x => new ContextTarget(x.FullPath, x.IsDirectory))));
+        // Cells are recycled on refresh and reparented by floating enlargement.
+        // Keep keyboard focus on the stable list after a row click, just as the
+        // context-menu path already does, rather than on a detached cell.
+        grid.AddHandler(Mouse.MouseUpEvent, new MouseButtonEventHandler((_, e) =>
+        {
+            if (e.ChangedButton != MouseButton.Left || Parent<TextBoxBase>(e.OriginalSource as DependencyObject) != null) return;
+            if (Parent<DataGridColumnHeader>(e.OriginalSource as DependencyObject) == null &&
+                Parent<ScrollBar>(e.OriginalSource as DependencyObject) == null && Parent<Thumb>(e.OriginalSource as DependencyObject) == null) Keyboard.Focus(grid);
+        }), true);
         grid.PreviewMouseRightButtonDown += (_, e) =>
         {
             var row = Parent<DataGridRow>(e.OriginalSource as DependencyObject);
@@ -225,21 +344,21 @@ internal sealed class FileContextMenus(MainViewModel vm)
         grid.ContextMenu = new ContextMenu();
         grid.ContextMenuOpening += (_, e) => { e.Handled = true; if (e.CursorLeft < 0) Show(grid, Menu(), true); };
     }
-    internal void AttachList(ListBox list, Func<object, ContextTarget> target)
+    internal void AttachList(ListBox list, Func<object, ContextTarget> target, Func<string?>? directory = null, DataGrid? backgroundGrid = null)
     {
         list.SelectionMode = SelectionMode.Extended;
         AttachPreview(list, target);
-        AttachKeys(list, () => list.SelectedItems.Cast<object>().Select(x => target(x).Path).ToArray(), () => PasteDestination(list.SelectedItems.Cast<object>().Select(target)));
-        ContextMenu Menu() => Build(list.SelectedItems.Cast<object>().Select(target).ToArray());
+        AttachKeys(list, () => list.SelectedItems.Cast<object>().Select(x => target(x).Path).ToArray(), () => directory?.Invoke() ?? PasteDestination(list.SelectedItems.Cast<object>().Select(target)));
+        ContextMenu Menu() => Build(list.SelectedItems.Cast<object>().Select(target).ToArray(), directory: directory?.Invoke());
         list.PreviewMouseRightButtonDown += (_, e) =>
         {
             if (Parent<TextBox>(e.OriginalSource as DependencyObject) != null) return;
             var row = Parent<ListBoxItem>(e.OriginalSource as DependencyObject);
-            if (row == null) return;
+            if (row == null) { if (backgroundGrid != null) { e.Handled=true; Show(backgroundGrid, Build([], directory:directory?.Invoke()), false); } return; }
             SelectForContext(list.SelectedItems, row.DataContext); list.Focus(); e.Handled = true; Show(row, Menu(), false);
         };
         list.ContextMenu = new ContextMenu();
-        list.ContextMenuOpening += (_, e) => { if (Parent<TextBox>(e.OriginalSource as DependencyObject) != null) return; e.Handled = true; if (e.CursorLeft < 0) Show(list, Menu(), true); };
+        list.ContextMenuOpening += (_, e) => { if (Parent<TextBox>(e.OriginalSource as DependencyObject) != null) return; e.Handled = true; if (e.CursorLeft < 0) Show(backgroundGrid ?? (FrameworkElement)list, Menu(), true); };
     }
     internal void AttachHeader(FrameworkElement header, Func<CardViewModel> card)
     {

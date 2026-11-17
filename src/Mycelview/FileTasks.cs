@@ -1,4 +1,4 @@
-﻿using System.Collections.Specialized;
+using System.Collections.Specialized;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -102,6 +102,26 @@ public sealed partial class FileTasks : Observable
         if (Busy || vm.WorkspaceBusy) return;
         var name = FileOperationDialogs.NewFolder(Owner); if (name == null) return;
         await ExecuteAsync("새 폴더 만들기", [new(FileAction.NewFolder, destination, Name: name)]);
+    }
+    internal async Task DeletePermanentlyAsync(IEnumerable<string> paths)
+    {
+        if(Busy || vm.WorkspaceBusy)return;
+        Busy=true;HasActivity=true;
+        cancellation=new CancellationTokenSource();
+        try
+        {
+            var items=FileOperationRules.TopLevel(paths);if(items.Length==0)return;
+            Status="영구 삭제 확인 대기 중…";
+            // No recycle/undo flags and no private undo copy. Windows supplies confirmation.
+            var flags=WindowsFileOperations.InteractiveFlags & ~(0x0040u|0x00080000u|0x20000000u);
+            var result=await WindowsFileOperations.RunAsync(items.Select(p=>new FileRequest(FileAction.Delete,p)).ToArray(),
+                new WindowInteropHelper(Owner).Handle,cancellation.Token,flags:flags);
+            await RefreshAsync();
+            Status=$"영구 삭제 {(result.Aborted?"취소/중단":"완료")} · {result.Completed.Count}개";
+            if(result.Errors.Count>0)Status+=" · "+string.Join(" / ",result.Errors.Take(3));
+        }
+        catch(Exception error){Status="영구 삭제 실패: "+error.Message;}
+        finally{Busy=false;cancellation.Dispose();cancellation=null;}
     }
     internal async Task RecycleAsync(IEnumerable<string> paths)
     {

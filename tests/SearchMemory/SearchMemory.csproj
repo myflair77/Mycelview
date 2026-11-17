@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+<PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable><SourceRoot Condition="'$(SourceRoot)' == ''">../../src/Mycelview</SourceRoot></PropertyGroup>
+<ItemGroup><Compile Include="$(SourceRoot)/SearchMemoryCache.cs" Link="SearchMemoryCache.cs"/><Compile Include="$(SourceRoot)/SearchQuery.cs" Link="SearchQuery.cs"/><Compile Include="$(SourceRoot)/SearchOptions.cs" Link="SearchOptions.cs"/><Compile Include="$(SourceRoot)/IndexDatabase.cs" Link="IndexDatabase.cs"/></ItemGroup>
+</Project>

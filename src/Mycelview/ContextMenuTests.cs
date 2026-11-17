@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.IO;
 using System.Windows;
 using System.Windows.Interop;
@@ -37,6 +37,24 @@ internal static class ContextMenuTests
             Check(properties < 0 || unregister > properties, "Unregister must follow properties.");
             log.Add("PASS: " + string.Join(", ", paths.Select(Path.GetFileName)));
             log.AddRange(after.Select(x => $"  {x.Id}: {x.Text} [{x.Verb}] bitmap={x.Bitmap != IntPtr.Zero}"));
+        }
+        using(var model=new MainViewModel(new StateStore(Path.Combine(directory,"search-location-state"))))
+        {
+            var actions=new FileContextMenus(model);
+            var revealed=new List<string>();actions.RevealPath=path=>revealed.Add(path);
+            actions.OpenPath=_=>throw new Exception("Open location must not execute a file or open inside the selected folder.");
+            foreach(var paths in new[]{new[]{first},new[]{folder},new[]{first,folder}})
+            {
+                using var menu=new NativeShellMenu(paths,owner.Handle);
+                menu.AddMycelviewItems(paths.All(File.Exists),paths.Length==1,false,false,searchResults:true);
+                var items=menu.Entries();int location=items.FindIndex(x=>x.Id==NativeShellMenu.OpenLocation);
+                Check(location>=0&&items[location].Text=="경로로 열기","Search has Open location");
+                Check(!items.Any(x=>x.Id==NativeShellMenu.Reveal),"Search avoids duplicate Explorer command");
+                Check(location<items.FindIndex(x=>x.Id is NativeShellMenu.AddFolder or NativeShellMenu.AddFile),"Location is beside open, before registration");
+                revealed.Clear();
+                actions.ExecuteMycelviewCommandAsync(NativeShellMenu.OpenLocation,"",paths.Select(p=>new ContextTarget(p,Directory.Exists(p))).ToArray()).GetAwaiter().GetResult();
+                Check(revealed.SequenceEqual(paths),"Files and folders both reveal their exact location");
+            }
         }
         var selection = new ArrayList { first, second }; FileContextMenus.SelectForContext(selection, first);
         Check(selection.Count == 2, "Right-click must retain multiselection.");

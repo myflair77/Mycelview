@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls.Primitives;
 using System.Windows.Media;
@@ -421,7 +421,7 @@ internal static class SmokeTests
             var restoredEnlargement=WorkspaceBackup.Read(enlargementBackup).Enlargement;
             Check(restoredEnlargement.FixedSize && restoredEnlargement.Width==900 && restoredEnlargement.DelayMs==450,"Enlargement preferences must round-trip through settings backup.");
             var clamped=new CardEnlargementSettings {Mode="invalid",Percent=900,Width=2,Height=9000,DelayMs=-2}.Normalize();
-            Check(clamped.Mode=="A" && clamped.Percent==300 && clamped.Width==400 && clamped.Height==1800 && clamped.DelayMs==0,"Invalid enlargement preferences must normalize safely.");
+            Check(clamped.Mode=="B" && clamped.Percent==300 && clamped.Width==400 && clamped.Height==1800 && clamped.DelayMs==0,"Invalid enlargement preferences must normalize safely.");
             results.Add("PASS: A/B/C enlargement, B neighboring layout restore, fixed dimensions, settings backup and validation.");
             await FilePreviewTests.RunAsync(window, directory);
             results.Add("PASS: bounded image/text preview, menu and Space/Esc, selection updates and cancellation (file-preview-results.txt).");

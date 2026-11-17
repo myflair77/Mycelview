@@ -1,4 +1,4 @@
-﻿using System.Collections.Concurrent;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -20,6 +20,58 @@ public static class ShellIcons
             (uint)Marshal.SizeOf<ShellFileInfo>(), 0x400u | 0x10u);
         return !string.IsNullOrWhiteSpace(info.TypeName) ? info.TypeName : folder ? "파일 폴더" : extension.Length == 0 ? "파일" : extension.TrimStart('.').ToUpperInvariant() + " 파일";
     });
+    private static readonly ConcurrentDictionary<string, ImageSource> sizedIcons = new(StringComparer.OrdinalIgnoreCase);
+    internal static ImageSource? Thumbnail(string path,int pixels)
+    {
+        IShellItemImageFactory? factory=null;IntPtr bitmap=IntPtr.Zero;
+        try
+        {
+            var iid=typeof(IShellItemImageFactory).GUID;
+            if(SHCreateItemFromParsingName(path,IntPtr.Zero,ref iid,out factory)<0)return null;
+            // THUMBNAILONLY: never mistake the registered file-type icon for content.
+            factory.GetImage(new IconSize{Width=pixels,Height=pixels},8,out bitmap);
+            var image=Imaging.CreateBitmapSourceFromHBitmap(bitmap,IntPtr.Zero,Int32Rect.Empty,BitmapSizeOptions.FromEmptyOptions());
+            image.Freeze();return image;
+        }
+        catch(COMException){return null;}
+        finally{if(bitmap!=IntPtr.Zero)DeleteObject(bitmap);if(factory!=null)Marshal.ReleaseComObject(factory);}
+    }
+    public static ImageSource ForSize(string path, bool folder, int pixels)
+    {
+        if (pixels <= 16) return ForPath(path, folder);
+        string extension = Path.GetExtension(path).ToLowerInvariant();
+        bool individual = DesktopItems.IsShellPath(path) || extension is ".lnk" or ".exe" or ".ico" or ".url" or ".appref-ms";
+        string key = pixels + ":" + (individual ? path : folder ? "<folder>" : extension);
+        if (sizedIcons.Count >= 256) sizedIcons.Clear();
+        return sizedIcons.GetOrAdd(key, _ =>
+        {
+            IShellItemImageFactory? factory = null;
+            IntPtr bitmap = IntPtr.Zero;
+            try
+            {
+                var iid = typeof(IShellItemImageFactory).GUID;
+                if (SHCreateItemFromParsingName(path, IntPtr.Zero, ref iid, out factory) >= 0)
+                {
+                    factory.GetImage(new IconSize { Width=pixels,Height=pixels }, 4, out bitmap);
+                    var image=Imaging.CreateBitmapSourceFromHBitmap(bitmap,IntPtr.Zero,Int32Rect.Empty,BitmapSizeOptions.FromEmptyOptions());
+                    image.Freeze(); return image;
+                }
+            }
+            catch (COMException) { }
+            finally
+            {
+                if(bitmap!=IntPtr.Zero) DeleteObject(bitmap);
+                if(factory!=null) Marshal.ReleaseComObject(factory);
+            }
+            return ForPath(path,folder);
+        });
+    }
+    [StructLayout(LayoutKind.Sequential)] private struct IconSize { public int Width, Height; }
+    [ComImport, Guid("bcc18b79-ba16-442f-80c4-8a59c30c463b"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    private interface IShellItemImageFactory { void GetImage(IconSize size, uint flags, out IntPtr bitmap); }
+    [DllImport("shell32.dll", CharSet=CharSet.Unicode)]
+    private static extern int SHCreateItemFromParsingName(string path, IntPtr bind, ref Guid iid, [MarshalAs(UnmanagedType.Interface)] out IShellItemImageFactory factory);
+    [DllImport("gdi32.dll")] private static extern bool DeleteObject(IntPtr bitmap);
     public static ImageSource ForPath(string path, bool folder)
     {
         string extension = Path.GetExtension(path);
@@ -30,6 +82,7 @@ public static class ShellIcons
             if (fileIcons.Count >= 1024) fileIcons.Clear();
             return fileIcons.GetOrAdd(DesktopItems.IsShellPath(path) ? path : Path.GetFullPath(path), fullPath => Load(fullPath, false, true));
         }
+        if (cache.Count >= 512) cache.Clear();
         return cache.GetOrAdd(folder ? "<folder>" : extension, key => Load(key, folder));
     }
     private static ImageSource Load(string pathOrExtension, bool folder, bool individual = false)
@@ -54,7 +107,7 @@ public static class ShellIcons
         {
             try
             {
-                var image = Imaging.CreateBitmapSourceFromHIcon(info.Icon, Int32Rect.Empty, BitmapSizeOptions.FromWidthAndHeight(16, 16));
+                var image = Imaging.CreateBitmapSourceFromHIcon(info.Icon, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
                 image.Freeze(); return image;
             }
             finally { DestroyIcon(info.Icon); }

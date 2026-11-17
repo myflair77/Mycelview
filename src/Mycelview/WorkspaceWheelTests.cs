@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -176,7 +176,7 @@ internal static class WorkspaceWheelTests
             Check(Math.Abs(window.FavoritesColumn.ActualWidth - 350) < 1, "Returning to the original tab must preserve right file pane boundary.");
             Check(vm.Save() && Math.Abs(store.Load().FavoritesRatio!.Value - .6) < .005 && store.Load().FavoritesWidth == 350 && store.Load().ExplorerTreeHeight == 210 && store.Load().ExplorerCollapsed == false && store.Load().ExplorerWidth == 320, "Global expanded state and width must persist.");
             var defaults = new CardEnlargementSettings();
-            Check(defaults.FixedSize && defaults.Width == 700 && defaults.Height == 600, "Enlargement defaults must be fixed 700 by 600.");
+            Check(defaults.Mode == "B" && defaults.FixedSize && defaults.Width == 700 && defaults.Height == 600, "Enlargement defaults must be fixed 700 by 600.");
             vm.FolderColumns = 1; window.FolderWorkspaceScroll.ScrollToTop(); window.UpdateLayout();
             await Task.Delay(200); window.UpdateLayout();
             foreach (var mode in new[] { "A", "B" })

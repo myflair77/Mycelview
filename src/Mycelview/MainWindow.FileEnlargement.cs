@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -8,6 +8,9 @@ namespace Mycelview;
 
 public partial class MainWindow
 {
+    private bool fileSectionPush;
+    private GridLength savedFileColumn, savedFavoriteRow, savedRecentRow;
+    private double savedFileMaxWidth, savedFolderMinWidth;
     private Grid? enlargedFileSection, fileSectionParent, fileSectionPlaceholder;
     private Canvas? fileSectionLayer;
     private Border? fileSectionFrame;
@@ -47,6 +50,7 @@ public partial class MainWindow
         UpdateFileSectionPins(); ViewModel.Changed(); ViewModel.Save();
     }
 
+    private void ShrinkFileSectionClick(object sender, RoutedEventArgs e) { CloseFileSectionEnlargement(); e.Handled=true; }
     private void UpdateFileSectionPins()
     {
         FavoritesEnlargementPin.Opacity = FileSectionPinned(false) ? 1 : .25;
@@ -57,6 +61,15 @@ public partial class MainWindow
             var hotspot = recent ? RecentEnlargeHotspot : FavoritesEnlargeHotspot;
             var icon = recent ? RecentEnlargeIcon : FavoritesEnlargeIcon;
             bool enlarged = section == enlargedFileSection;
+            var pin=recent?RecentEnlargementPin:FavoritesEnlargementPin;
+            (recent?RecentShrinkButton:FavoritesShrinkButton).Visibility=enlarged?Visibility.Visible:Visibility.Collapsed;
+            icon.Visibility=enlarged?Visibility.Collapsed:Visibility.Visible;
+            if(enlarged)hotspot.Background=Brushes.Transparent;
+            else hotspot.SetResourceReference(Border.BackgroundProperty,"SelectionBrush");
+            pin.Width=enlarged?16:8;pin.Height=enlarged?20:10;
+            pin.HorizontalAlignment=enlarged?HorizontalAlignment.Center:HorizontalAlignment.Right;
+            pin.VerticalAlignment=enlarged?VerticalAlignment.Center:VerticalAlignment.Top;
+            pin.Margin=enlarged?new Thickness(0):new Thickness(0,1,1,0);
             icon.Data = Geometry.Parse(enlarged
                 ? "M1,1 L6,6 M2,6 L6,6 L6,2 M15,15 L10,10 M14,10 L10,10 L10,14 M15,1 L10,6 M14,6 L10,6 L10,2 M1,15 L6,10 M2,10 L6,10 L6,14"
                 : "M6,6 L1,1 M1,5 L1,1 L5,1 M10,10 L15,15 M11,15 L15,15 L15,11 M10,6 L15,1 M11,1 L15,1 L15,5 M6,10 L1,15 M1,11 L1,15 L5,15");
@@ -87,8 +100,18 @@ public partial class MainWindow
         fileSectionFrame.Drop += WorkspaceDrop;
         fileSectionFrame.SetResourceReference(BackgroundProperty, "CanvasBrush");
         fileSectionFrame.SetResourceReference(BorderBrushProperty, "AccentBrush");
+        fileSectionPush=ViewModel.Enlargement.Mode=="B";
+        if(fileSectionPush)
+        {
+            savedFileColumn=FavoritesColumn.Width;savedFileMaxWidth=FavoritesColumn.MaxWidth;
+            savedFolderMinWidth=PaneGrid.ColumnDefinitions[2].MinWidth;
+            savedFavoriteRow=FavoritesRow.Height;savedRecentRow=RecentRow.Height;
+            FavoritesColumn.MaxWidth=double.PositiveInfinity;PaneGrid.ColumnDefinitions[2].MinWidth=220;
+            fileSectionParent.Children.Remove(fileSectionPlaceholder);
+            Grid.SetRow(fileSectionFrame,Grid.GetRow(section));fileSectionParent.Children.Add(fileSectionFrame);
+        }
         fileSectionLayer = new Canvas();
-        fileSectionLayer.Children.Add(fileSectionFrame); WindowLayers.Children.Add(fileSectionLayer);
+        if(!fileSectionPush){fileSectionLayer.Children.Add(fileSectionFrame); WindowLayers.Children.Add(fileSectionLayer);}
         UpdateLayout(); ResizeFileSection(null, null!); UpdateFileSectionPins();
         SizeChanged += ResizeFileSection; Deactivated += DeactivateFileSection;
         fileSectionOpened = DateTime.UtcNow;
@@ -102,6 +125,17 @@ public partial class MainWindow
         var settings = ViewModel.Enlargement;
         double width = Math.Min(Math.Max(fileSectionSize.Width + 22, settings.FixedSize ? settings.Width : fileSectionSize.Width * settings.Percent / 100), Math.Max(100, WindowLayers.ActualWidth - 24));
         double height = Math.Min(Math.Max(fileSectionSize.Height + 22, settings.FixedSize ? settings.Height : fileSectionSize.Height * settings.Percent / 100), Math.Max(100, WindowLayers.ActualHeight - 24));
+        if(fileSectionPush)
+        {
+            width=Math.Min(width,Math.Max(220,PaneGrid.ActualWidth-ExplorerColumn.ActualWidth-230));
+            FavoritesColumn.Width=new GridLength(width+24);
+            var row=enlargedFileSection==RecentSection?RecentRow:FavoritesRow;
+            var other=enlargedFileSection==RecentSection?FavoritesRow:RecentRow;
+            height=Math.Min(height,Math.Max(100,fileSectionParent!.ActualHeight-other.MinHeight-5));
+            row.Height=new GridLength(height);other.Height=new GridLength(1,GridUnitType.Star);
+            fileSectionFrame.Width=double.NaN;fileSectionFrame.Height=double.NaN;
+            return;
+        }
         var point = fileSectionPlaceholder.TranslatePoint(new Point(), WindowLayers);
         fileSectionFrame.Width = width; fileSectionFrame.Height = height;
         Canvas.SetLeft(fileSectionFrame, Math.Clamp(point.X + fileSectionPlaceholder.ActualWidth - width + 11, 12, Math.Max(12, WindowLayers.ActualWidth - width - 12)));
@@ -126,7 +160,16 @@ public partial class MainWindow
         if (enlargedFileSection == null) return;
         fileSectionMonitor?.Stop(); SizeChanged -= ResizeFileSection; Deactivated -= DeactivateFileSection;
         var section = enlargedFileSection;
-        fileSectionFrame!.Child = null; WindowLayers.Children.Remove(fileSectionLayer!);
+        fileSectionFrame!.Child = null;
+        if(fileSectionPush)
+        {
+            fileSectionParent!.Children.Remove(fileSectionFrame);
+            FavoritesColumn.Width=savedFileColumn;FavoritesColumn.MaxWidth=savedFileMaxWidth;
+            PaneGrid.ColumnDefinitions[2].MinWidth=savedFolderMinWidth;
+            FavoritesRow.Height=savedFavoriteRow;RecentRow.Height=savedRecentRow;
+            fileSectionPush=false;
+        }
+        else WindowLayers.Children.Remove(fileSectionLayer!);
         fileSectionParent!.Children.Remove(fileSectionPlaceholder!);
         section.Margin = fileSectionMargin; fileSectionParent.Children.Add(section);
         enlargedFileSection = null; fileSectionFrame = null; fileSectionLayer = null; fileSectionPlaceholder = null; fileSectionParent = null;

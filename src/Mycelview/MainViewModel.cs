@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
@@ -17,11 +17,14 @@ public sealed partial class MainViewModel : Observable, IDisposable
     public FileTasks FileTasks { get; }
     public PaneLayout Layout { get; private set; } = new();
     public EdgeActivationSettings EdgeActivation { get; set; } = new();
+    private bool singleClickPreview;
+    public bool SingleClickPreview { get => singleClickPreview; set => Set(ref singleClickPreview, value); }
     public bool ExplorerCollapsed { get; set; }
     public double ExplorerWidth { get; set; } = 280;
     public double ExplorerTreeHeight { get; set; } = 160;
     public double FavoritesWidth { get; set; } = 265;
     public double FavoritesRatio { get; set; } = .5;
+    public ObservableCollection<LauncherFavorite> LauncherFavorites { get; } = [];
     public ObservableCollection<RecentFile> RecentFiles { get; } = [];
     internal void RecordOpenedFile(string path)
     {
@@ -40,13 +43,13 @@ public sealed partial class MainViewModel : Observable, IDisposable
     public int RecentColumns { get => recentColumns; set { var count = Math.Clamp(value, 1, 5); if (count == recentColumns) return; recentColumns = count; Notify(); Notify(nameof(RecentColumnsLabel)); Changed(); } }
     public string FavoriteColumnsLabel => $"{FavoriteColumns}열 배치 ▾";
     public string RecentColumnsLabel => $"{RecentColumns}열 배치 ▾";
-    private double folderHeight = 340;
+    private double folderHeight = 380;
     public double FolderHeight
     {
         get => folderHeight;
         set
         {
-            var height = double.IsFinite(value) ? Math.Clamp(Math.Round(value), 260, 800) : 340;
+            var height = double.IsFinite(value) ? Math.Clamp(Math.Round(value), 260, 800) : 380;
             if (folderHeight == height) return;
             folderHeight = height; Notify(); Notify(nameof(CanDecreaseHeight)); Notify(nameof(CanIncreaseHeight));
             foreach (var card in Folders) card.Height = height;
@@ -110,13 +113,15 @@ public sealed partial class MainViewModel : Observable, IDisposable
     public RelayCommand AddFolder { get; }
     public RelayCommand AddFiles { get; }
     private bool collapseNext = true;
-    public string ToggleFoldersLabel => collapseNext ? "모두 접기" : "모두 펼치기";
+    public string ToggleFoldersLabel => collapseNext ? "폴더 모두 접기" : "폴더 모두 펼치기";
+    public string ToggleFolderPinsLabel => Folders.Any() && Folders.All(c => c.State.EnlargementPinned) ? "핀 일괄 해제" : "핀 일괄 설정";
     public RelayCommand ToggleFolders { get; }
     public RelayCommand CollapseAll { get; }
     public RelayCommand ExpandAll { get; }
 
     public MainViewModel(StateStore store, string? indexDirectory = null)
     {
+        LauncherFavorites.CollectionChanged += (_, _) => Notify(nameof(LauncherGroups));
         this.store = store;
         FileTasks = new(this);
         Index = new LocalSearchIndex(indexDirectory ?? store.DirectoryPath);
@@ -142,6 +147,8 @@ public sealed partial class MainViewModel : Observable, IDisposable
         try
         {
             var saved = store.Load();
+            LoadLauncherGroupOrder(saved.LauncherGroupOrder);
+            foreach (var item in saved.LauncherFavorites ?? []) if (item != null) LauncherFavorites.Add(item);
             Enlargement = saved.Enlargement ?? new();
             TextScalePercent = saved.TextScalePercent;
             foreach (var recent in (saved.RecentFiles ?? []).Where(r => r != null && !string.IsNullOrWhiteSpace(r.CurrentPath)).DistinctBy(r => r.CurrentPath, StringComparer.OrdinalIgnoreCase).Take(100)) RecentFiles.Add(recent);
@@ -169,7 +176,7 @@ public sealed partial class MainViewModel : Observable, IDisposable
         var state = System.Text.Json.JsonSerializer.Deserialize<CardState>(System.Text.Json.JsonSerializer.Serialize(card.State))!;
         state.Id = Guid.NewGuid(); state.X += 28; state.Y += 28; AddState(state); _ = Cards[^1].RefreshAsync(); Changed();
     }
-    public void Changed() { if (SettingsBusy || WorkspaceBusy) return; saveTimer.Stop(); saveTimer.Start(); }
+    public void Changed() { Notify(nameof(ToggleFolderPinsLabel)); if (SettingsBusy || WorkspaceBusy) return; saveTimer.Stop(); saveTimer.Start(); }
     public bool Save()
     {
         saveTimer.Stop(); if (!canSave || SettingsBusy || WorkspaceBusy) return false;
@@ -178,6 +185,8 @@ public sealed partial class MainViewModel : Observable, IDisposable
     }
     public void Dispose() { FileService.FileOpened -= RecordOpenedFile; saveTimer.Stop(); reconcileTimer.Stop(); Explorer.Dispose(); Search.Dispose(); Index.Dispose(); foreach (var c in Cards) c.Dispose(); }
 }
+
+
 
 
 

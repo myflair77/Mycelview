@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -44,17 +44,19 @@ public partial class CardView
     internal void BeginInlineRename(FileEntry entry)
     {
         if(entry.IsShellItem || !IsLoaded || Workspace.FileTasks.Busy || FileList.SelectedItems.Count!=1 || !Equals(FileList.SelectedItem,entry))return;
-        if(FileList.ItemContainerGenerator.ContainerFromItem(entry) is not DataGridRow row)return;
+        var icons=FolderViewModes.For(FileList)?.Icons;
+        var row=icons?.Visibility==Visibility.Visible ? icons.ItemContainerGenerator.ContainerFromItem(entry) as DependencyObject : FileList.ItemContainerGenerator.ContainerFromItem(entry) as DependencyObject;
+        if(row==null)return;
         var editor=FindChild<TextBox>(row);if(editor==null)return;
         EndInlineRename(false);renameEntry=entry;renameEditor=editor;editor.Text=entry.Name;editor.Visibility=Visibility.Visible;
         editor.Focus();editor.Select(0,entry.IsDirectory?entry.Name.Length:Path.GetFileNameWithoutExtension(entry.Name).Length);
     }
-    private void InlineRenameKeyDown(object sender,KeyEventArgs e)
+    internal void InlineRenameKeyDown(object sender,KeyEventArgs e)
     {
         if(e.Key==Key.Escape){e.Handled=true;EndInlineRename(false);}
         else if(e.Key==Key.Enter){e.Handled=true;EndInlineRename(true);}
     }
-    private void InlineRenameLostFocus(object sender,KeyboardFocusChangedEventArgs e)=>EndInlineRename(true);
+    internal void InlineRenameLostFocus(object sender,KeyboardFocusChangedEventArgs e)=>EndInlineRename(true);
     private async void EndInlineRename(bool commit)
     {
         if(renameEditor is not {} editor || renameEntry is not {} entry)return;

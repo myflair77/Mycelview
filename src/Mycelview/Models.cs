@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 
@@ -27,7 +27,9 @@ public sealed class CardState
     public double X { get; set; } = 20;
     public double Y { get; set; } = 20;
     public double Width { get; set; } = 460;
-    public double Height { get; set; } = 340;
+    public double Height { get; set; } = 380;
+    public string ViewMode { get; set; } = "Details";
+    public string GroupMode { get; set; } = "";
     public bool EnlargementPinned { get; set; }
     public bool Collapsed { get; set; }
     public bool NoteVisible { get; set; }
@@ -51,7 +53,7 @@ public sealed class WorkspaceTab : Observable
     public bool FavoritesEnlargementPinned { get; set; }
     public bool RecentEnlargementPinned { get; set; }
     public int FolderColumns { get; set; } = 2;
-    public double FolderHeight { get; set; } = 340;
+    public double FolderHeight { get; set; } = 380;
     public bool ShowModified { get; set; } = true;
     public bool ShowSize { get; set; } = true;
     public bool ShowType { get; set; }
@@ -69,6 +71,11 @@ public sealed class WorkspaceTab : Observable
 }
 public sealed class WorkspaceState
 {
+    public List<string> LauncherGroupOrder { get; set; } = ["App","Browser","Website"];
+    public List<LauncherFavorite> LauncherFavorites { get; set; } = [];
+    public bool ShowHiddenFiles { get; set; }
+    public bool ShowFileExtensions { get; set; } = true;
+    public bool SingleClickPreview { get; set; }
     public SearchOptions SearchOptions { get; set; } = new();
     public EdgeActivationSettings EdgeActivation { get; set; } = new();
     public bool? ExplorerCollapsed { get; set; }
@@ -84,7 +91,7 @@ public sealed class WorkspaceState
     public PaneLayout Layout { get; set; } = new();
     public List<RecentFile> RecentFiles { get; set; } = [];
     public int FolderColumns { get; set; } = 2;
-    public double FolderHeight { get; set; } = 340;
+    public double FolderHeight { get; set; } = 380;
     public bool ShowModified { get; set; } = true;
     public bool ShowSize { get; set; } = true;
     public bool ShowType { get; set; }
@@ -110,6 +117,8 @@ public sealed record RecentFile(string CurrentPath, DateTimeOffset OpenedAt)
 }
 public sealed record FileEntry(string FullPath, string Name, bool IsDirectory, DateTime Modified, long Length)
 {
+    public System.IO.FileAttributes Attributes { get; init; }
+    public bool IsHidden => (Attributes & System.IO.FileAttributes.Hidden) != 0;
     public DateTime Created { get; init; }
     public bool IsShellItem => DesktopItems.IsShellPath(FullPath);
     public string ModifiedDisplay => IsShellItem ? "" : Modified.ToString("yy.MM.dd HH:mm");
@@ -120,6 +129,8 @@ public sealed record FileEntry(string FullPath, string Name, bool IsDirectory, D
     public string Icon => IsDirectory ? "📁" : "📄";
     public string Size => IsShellItem || IsDirectory ? "—" : Length < 1024 ? $"{Length:N0} B" : Length < 1048576 ? $"{Length / 1024d:N1} KB" : $"{Length / 1048576d:N1} MB";
 }
+
+
 
 
 

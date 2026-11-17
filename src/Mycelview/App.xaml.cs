@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 
 namespace Mycelview;
@@ -11,6 +11,59 @@ public partial class App : Application
         TextScale.Apply(100);
         TransientPopupTracking.Initialize();
         SkinManager.Apply(SkinManager.DefaultId);
+        if (e.Args.Length >= 2 && e.Args[0] == "--test-app-zones")
+        {
+            ShutdownMode=ShutdownMode.OnExplicitShutdown;
+            var output=Path.GetFullPath(e.Args[1]);Directory.CreateDirectory(output);
+            try { AppZoneTests.Run(output); Shutdown(0); }
+            catch(Exception error){File.WriteAllText(Path.Combine(output,"failure.txt"),error.ToString());Shutdown(1);}
+            return;
+        }
+        if (e.Args.Length >= 2 && e.Args[0] == "--test-launcher")
+        {
+            ShutdownMode=ShutdownMode.OnExplicitShutdown;
+            var output=Path.GetFullPath(e.Args[1]);Directory.CreateDirectory(output);
+            try { await LauncherTests.RunAsync(output); Shutdown(0); }
+            catch(Exception error){File.WriteAllText(Path.Combine(output,"failure.txt"),error.ToString());Shutdown(1);}
+            return;
+        }
+        if (e.Args.Length >= 2 && e.Args[0] == "--test-explorer-features")
+        {
+            ShutdownMode=ShutdownMode.OnExplicitShutdown;
+            var output=Path.GetFullPath(e.Args[1]);Directory.CreateDirectory(output);
+            try {await ExplorerCompatibilityTests.RunAsync(output);Shutdown(0);}
+            catch(Exception error){File.WriteAllText(Path.Combine(output,"failure.txt"),error.ToString());Shutdown(1);}
+            return;
+        }
+        if (e.Args.Length >= 2 && e.Args[0] == "--test-click-preview")
+        {
+            ShutdownMode=ShutdownMode.OnExplicitShutdown;
+            var output=Path.GetFullPath(e.Args[1]);Directory.CreateDirectory(output);
+            try { SingleClickPreviewTests.Run(output); Shutdown(0); }
+            catch(Exception error){File.WriteAllText(Path.Combine(output,"failure.txt"),error.ToString());Shutdown(1);}
+            return;
+        }
+        if (e.Args.Length >= 2 && e.Args[0] == "--test-folder-views")
+        {
+            ShutdownMode=ShutdownMode.OnExplicitShutdown;
+            var output=Path.GetFullPath(e.Args[1]);Directory.CreateDirectory(output);
+            try { await FolderViewModeTests.RunAsync(output); Shutdown(0); }
+            catch(Exception error){File.WriteAllText(Path.Combine(output,"failure.txt"),error.ToString());Shutdown(1);}
+            return;
+        }
+        if (e.Args.Length >= 2 && e.Args[0] == "--test-background-menu")
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            var output = Path.GetFullPath(e.Args[1]);
+            Directory.CreateDirectory(output);
+            try
+            {
+                await FolderInteractionTests.RunAsync(output);
+                Shutdown(0);
+            }
+            catch (Exception error) { File.WriteAllText(Path.Combine(output, "failure.txt"), error.ToString()); Shutdown(1); }
+            return;
+        }
         if (e.Args.Length >= 2 && e.Args[0] == "--test-shell-icons")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -86,6 +139,8 @@ public partial class App : Application
     }
     protected override void OnExit(ExitEventArgs e) { instanceMutex?.Dispose(); base.OnExit(e); }
 }
+
+
 
 
 
