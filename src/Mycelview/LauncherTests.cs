@@ -32,6 +32,7 @@ internal static class LauncherTests
         }
         var browser=new LauncherFavorite{Name="브라우저",Kind="Browser",Target=exe};
         var site=new LauncherFavorite{Name="테스트 사이트",Kind="Website",Target="https://example.com/search?q=한글&name=two%20words",BrowserPath=exe};
+        Check(LauncherEdgeSetup.Executable(site)==exe,"Site edge uses its selected browser");
         Check(LauncherService.Prepare(app).FileName==exe,"Application target");
         Check(LauncherService.Prepare(browser).FileName==exe,"Browser target");
         var launch=LauncherService.Prepare(site);
@@ -118,9 +119,3 @@ internal static class LauncherTests
         finally{window.Close();}
     }
 }
-
-
-
-
-
-

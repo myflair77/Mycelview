@@ -1,4 +1,4 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
@@ -20,10 +20,13 @@ internal sealed class EdgeActivationMarker : IDisposable
             ? (settings.Edge == "Right" ? monitor.Right - thickness : monitor.Left, monitor.Top + start, thickness, Math.Max(1, end - start))
             : (monitor.Left + start, settings.Edge == "Bottom" ? monitor.Bottom - thickness : monitor.Top, Math.Max(1, end - start), thickness);
     }
-    internal void Update(EdgeMonitor? monitor, EdgeActivationSettings settings)
+    internal Color? DisplayColor => ((marker?.Content as Border)?.Background as SolidColorBrush)?.Color;
+    internal void Update(EdgeMonitor? monitor, EdgeActivationSettings settings, Color? regionColor = null)
     {
         if (!settings.Enabled || monitor == null) { marker?.Hide(); lastBounds = null; return; }
-        var bounds = Bounds(monitor, settings); string key = bounds.ToString();
+        var color=regionColor??Colors.DodgerBlue;
+        byte alpha=(byte)Math.Round(Math.Clamp(double.IsFinite(settings.OpacityPercent)?settings.OpacityPercent:EdgeActivationSettings.DefaultOpacityPercent,0,100)*255/100);
+        var bounds = Bounds(monitor, settings); string key = bounds.ToString()+color.ToString()+alpha;
         if (key == lastBounds && marker?.IsVisible == true) return;
         if (marker == null)
         {
@@ -35,6 +38,7 @@ internal sealed class EdgeActivationMarker : IDisposable
             int style = GetWindowLong(handle, -20);
             SetWindowLong(handle, -20, style | 0x20 | 0x80 | 0x08000000); // transparent, tool window, no activate
         }
+        ((Border)marker.Content).Background=new SolidColorBrush(Color.FromArgb(alpha,color.R,color.G,color.B));
         marker.Show();
         SetWindowPos(new WindowInteropHelper(marker).Handle, new IntPtr(-1), bounds.X, bounds.Y, bounds.Width, bounds.Height, 0x10 | 0x40);
         lastBounds = key;

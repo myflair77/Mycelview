@@ -6,6 +6,18 @@ internal static class LauncherEdgeSetup
     internal static string Executable(LauncherFavorite favorite)
     {
         var path=favorite.Target;
+        if(favorite.Kind=="Website"){
+            path=favorite.BrowserPath;
+            if(string.IsNullOrWhiteSpace(path)){
+                using var choice=Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https\UserChoice");
+                var id=choice?.GetValue("ProgId") as string;
+                using var key=id==null?null:Microsoft.Win32.Registry.ClassesRoot.OpenSubKey(id+@"\shell\open\command");
+                var command=key?.GetValue(null) as string??"";
+                var match=System.Text.RegularExpressions.Regex.Match(command,"^\\s*\"([^\"]+\\.exe)\"|^\\s*(.+?\\.exe)(?:\\s|$)",System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                path=match.Success?Environment.ExpandEnvironmentVariables(match.Groups[1].Success?match.Groups[1].Value:match.Groups[2].Value):"";
+            }
+            if(!File.Exists(path))throw new InvalidDataException("사이트에 사용할 브라우저를 먼저 지정하세요. 가장자리에서는 해당 브라우저의 열린 창을 선택합니다.");
+        }
         if(Path.GetExtension(path).Equals(".lnk",StringComparison.OrdinalIgnoreCase)){
             object? shell=null,link=null;
             try{
@@ -23,7 +35,7 @@ internal static class LauncherEdgeSetup
         var path=Executable(favorite);
         var zone=settings.AppZones.FirstOrDefault(z=>StringComparer.OrdinalIgnoreCase.Equals(z.AppPath,path));
         if(zone==null){
-            zone=new(){AppPath=path,Name=favorite.Name};
+            zone=new(){AppPath=path,Name=favorite.Kind=="Website"?favorite.Name+" · 브라우저 창":favorite.Name};
             bool assigned=false;
             foreach(var edge in new[]{"Left","Right","Top","Bottom"}){
                 for(int start=0;start<100;start+=25){

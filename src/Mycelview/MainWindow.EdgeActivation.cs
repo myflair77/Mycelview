@@ -66,6 +66,17 @@ public partial class MainWindow
         }
         thicknessDown.Click += (_, _) => ChangeThickness(-1); thicknessUp.Click += (_, _) => ChangeThickness(1);
         thicknessRow.Children.Add(thicknessDown); thicknessRow.Children.Add(thicknessValue); thicknessRow.Children.Add(thicknessUp); panel.Children.Add(thicknessRow); ChangeThickness(0);
+        Label("불투명도");
+        var opacityRow=new DockPanel();
+        var opacityValue=new TextBlock{Width=65,VerticalAlignment=VerticalAlignment.Center,TextAlignment=TextAlignment.Right};
+        DockPanel.SetDock(opacityValue,Dock.Right);opacityRow.Children.Add(opacityValue);
+        var opacityReset=new Button{Content="기본값",ToolTip="기본 불투명도 35%로 되돌립니다."};
+        DockPanel.SetDock(opacityReset,Dock.Right);opacityRow.Children.Add(opacityReset);
+        var opacity=new Slider{Minimum=0,Maximum=100,Value=saved.OpacityPercent,TickFrequency=1,SmallChange=1,LargeChange=10,IsMoveToPointEnabled=true,ToolTip="0%는 완전 투명, 100%는 완전 불투명입니다. 표시 농도만 바뀌며 호출 기능은 유지됩니다."};
+        System.Windows.Automation.AutomationProperties.SetName(opacity,"반응 구간 불투명도");
+        opacityRow.Children.Add(opacity);panel.Children.Add(opacityRow);
+        void UpdateOpacity(){opacityValue.Text=$"{opacity.Value:0.#}%";}
+        opacity.ValueChanged+=(_,_)=>UpdateOpacity();opacityReset.Click+=(_,_)=>opacity.Value=EdgeActivationSettings.DefaultOpacityPercent;UpdateOpacity();
         Label("대기 시간");
         int delayMs = saved.DelayMs;
         var delayRow = new StackPanel { Orientation = Orientation.Horizontal };
@@ -100,7 +111,15 @@ public partial class MainWindow
         edge.SelectionChanged += (_, _) => UpdateMonitors(); UpdateMonitors();
         int helpStart=panel.Children.Count;
         int appStart=panel.Children.Count;
-        var appZones = AddAppZoneEditor(panel, saved);
+        EdgeActivationSettings BasicRegion() => new(){Enabled=enabled.IsChecked==true,Edge=edges[edge.SelectedIndex],Monitor=(string?)monitor.SelectedValue??"Automatic",StartPercent=rangeMode.SelectedIndex==0?0:(int)rangeStart.Value,EndPercent=rangeMode.SelectedIndex==0?100:(int)rangeEnd.Value};
+        Action<string> navigate=_=>{};
+        Action<string,string,string,int,int> updateZone=(_,_,_,_,_)=>{};
+        var appZones = AddAppZoneEditor(panel, saved, BasicRegion,key=>navigate(key),out var selectApp,out var updateApp,(key,device,side,a,b)=>updateZone(key,device,side,a,b));
+        updateZone=(key,device,side,a,b)=>{
+            if(key!="Mycelview"){updateApp(key,device,side,a,b);return;}
+            edge.SelectedIndex=Array.IndexOf(edges,side);monitor.SelectedValue=device;rangeMode.SelectedIndex=1;
+            adjustingRange=true;rangeStart.Value=a;rangeEnd.Value=b;adjustingRange=false;UpdateRange();
+        };
         int appEnd=panel.Children.Count;
         var error = new TextBlock { TextWrapping = TextWrapping.Wrap }; panel.Children.Add(error);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0,12,0,0) }; panel.Children.Add(buttons);
@@ -111,7 +130,7 @@ public partial class MainWindow
             int end = rangeMode.SelectedIndex == 0 ? 100 : (int)Math.Round(rangeEnd.Value);
             if (!ValidateAppZones(appZones, out var zoneError)) { error.Text=zoneError; return; }
             var previous = ViewModel.EdgeActivation;
-            ViewModel.EdgeActivation = new() { AppZones = appZones, Enabled = enabled.IsChecked == true, Edge = edges[Math.Max(0, edge.SelectedIndex)], DelayMs = delayMs, ThicknessPixels = thicknessPixels, StartPercent = start, EndPercent = end, Monitor = (string?)monitor.SelectedValue ?? "Automatic" };
+            ViewModel.EdgeActivation = new() { AppZones = appZones, Enabled = enabled.IsChecked == true, Edge = edges[Math.Max(0, edge.SelectedIndex)], DelayMs = delayMs, ThicknessPixels = thicknessPixels, OpacityPercent = opacity.Value, StartPercent = start, EndPercent = end, Monitor = (string?)monitor.SelectedValue ?? "Automatic" };
             if (!ViewModel.Save()) { ViewModel.EdgeActivation = previous; error.Text = "설정을 저장하지 못했습니다. 다시 시도하세요."; return; }
             dialog.DialogResult = true;
         };
@@ -120,6 +139,11 @@ public partial class MainWindow
         panel.Children.Clear();
         var basic=new StackPanel();
         foreach(var child in children.Skip(1).Take(commonStart-1).Concat(children.Skip(monitorStart).Take(helpStart-monitorStart)))basic.Children.Add(child);
+        basic.Children.Remove(preview);
+        basic.Children.Insert(0,ScreenEdgePicker.Create(()=>new EdgeActivationSettings{Edge=edges[edge.SelectedIndex],Monitor=(string?)monitor.SelectedValue??"Automatic",StartPercent=rangeMode.SelectedIndex==0?0:(int)rangeStart.Value,EndPercent=rangeMode.SelectedIndex==0?100:(int)rangeEnd.Value},(device,side,a,b)=>{
+            edge.SelectedIndex=Array.IndexOf(edges,side);monitor.SelectedValue=device;rangeMode.SelectedIndex=1;
+            adjustingRange=true;rangeStart.Value=a;rangeEnd.Value=b;adjustingRange=false;UpdateRange();
+        },()=>ScreenEdgePicker.Zones(BasicRegion(),appZones),"Mycelview",key=>navigate(key),(key,device,side,a,b)=>updateZone(key,device,side,a,b)));
         var common=new StackPanel();
         foreach(var child in children.Skip(commonStart).Take(monitorStart-commonStart))common.Children.Add(child);
         var apps=new StackPanel();
@@ -129,8 +153,9 @@ public partial class MainWindow
             tabs.Items.Add(new TabItem{Header=title,ToolTip=hint,Content=new ScrollViewer{Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,Padding=new Thickness(12,6,12,10)}});
         }
         Tab("Mycelview 호출",basic,"화면 가장자리에서 Mycelview 창을 앞으로 가져올 위치를 지정합니다.");
-        Tab("앱별 창 선택",apps,"앱마다 반응 구간을 지정하고 열린 창의 미리보기에서 전환합니다. 한 창의 탭은 하나로 취급합니다.");
+        Tab("브라우저·사이트·앱별 선택",apps,"앱마다 반응 구간을 지정하고 열린 창의 미리보기에서 전환합니다. 한 창의 탭은 하나로 취급합니다.");
         Tab("반응 설정",common,"Mycelview 호출과 앱별 창 선택에 공통으로 적용됩니다.");
+        navigate=key=>{if(key=="Mycelview")tabs.SelectedIndex=0;else{selectApp(key);tabs.SelectedIndex=1;}};
         tabs.SelectedIndex=favorite==null?0:1;
         var root=new DockPanel{Margin=new Thickness(18)};
         DockPanel.SetDock(enabled,Dock.Top);root.Children.Add(enabled);
@@ -148,8 +173,3 @@ public partial class MainWindow
         return dialog;
     }
 }
-
-
-
-
-

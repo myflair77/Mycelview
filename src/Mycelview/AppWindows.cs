@@ -13,7 +13,7 @@ public sealed class AppWindowZone
     public int StartPercent { get; set; }
     public int EndPercent { get; set; } = 25;
     public string Monitor { get; set; } = "Automatic";
-    public EdgeActivationSettings Region(EdgeActivationSettings global) => new() { Enabled=true, Edge=Edge, StartPercent=StartPercent, EndPercent=EndPercent, Monitor=Monitor, DelayMs=global.DelayMs,ThicknessPixels=global.ThicknessPixels };
+    public EdgeActivationSettings Region(EdgeActivationSettings global) => new() { Enabled=true, Edge=Edge, StartPercent=StartPercent, EndPercent=EndPercent, Monitor=Monitor, DelayMs=global.DelayMs,ThicknessPixels=global.ThicknessPixels,OpacityPercent=global.OpacityPercent };
     public AppWindowZone Normalized()
     {
         var copy=Copy();
@@ -76,4 +76,3 @@ internal static class AppWindows
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint a,uint b,bool attach);
 }
-

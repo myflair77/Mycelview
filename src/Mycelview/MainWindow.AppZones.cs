@@ -21,13 +21,16 @@ public partial class MainWindow
         }
         return true;
     }
-    private List<AppWindowZone> AddAppZoneEditor(StackPanel parent,EdgeActivationSettings saved)
+    private List<AppWindowZone> AddAppZoneEditor(StackPanel parent,EdgeActivationSettings saved,Func<EdgeActivationSettings>? basicRegion,Action<string> navigate,out Action<string> selectApp,out Action<string,string,string,int,int> updateApp,Action<string,string,string,int,int> updateZone)
     {
         var zones=(saved.AppZones??[]).Select(x=>x.Copy()).ToList();
+        var updates=new Dictionary<string,Action<string,string,int,int>>();
+        updateApp=(key,device,edge,a,b)=>{if(updates.TryGetValue(key,out var update))update(device,edge,a,b);};
 
 
         var selector=new ComboBox{DisplayMemberPath="Name",Margin=new Thickness(0,0,0,8),ToolTip="등록한 앱을 선택해 반응 구간을 수정합니다."};
         parent.Children.Add(selector);
+        selectApp=key=>selector.SelectedItem=zones.FirstOrDefault(z=>z.Id.ToString()==key);
         var editors=new Dictionary<AppWindowZone,Border>();
         void RefreshSelection(AppWindowZone? selected){
             selector.ItemsSource=null;selector.ItemsSource=zones;selector.SelectedItem=selected??zones.FirstOrDefault();
@@ -86,6 +89,12 @@ public partial class MainWindow
                 updating=false;
             }
             start.ValueChanged+=(_,_)=>Range(true);end.ValueChanged+=(_,_)=>Range(false);edge.SelectionChanged+=(_,_)=>Range(true);Range(true);
+            Action<string,string,int,int> change=(device,side,a,b)=>{
+                z.Monitor=device;z.Edge=side;edge.SelectedIndex=Array.IndexOf(edges,side);Monitors();monitor.SelectedValue=device;
+                updating=true;start.Value=a;end.Value=b;updating=false;Range(true);
+            };
+            updates[z.Id.ToString()]=change;
+            panel.Children.Add(ScreenEdgePicker.Create(()=>z.Region(saved),change,()=>ScreenEdgePicker.Zones(basicRegion?.Invoke()??saved,zones),z.Id.ToString(),navigate,updateZone));
         }
         foreach(var z in zones)Row(z);
         add.Click+=(_,_)=>{var z=new AppWindowZone{Name="새 앱"};zones.Add(z);Row(z);RefreshSelection(z);};
@@ -93,7 +102,3 @@ public partial class MainWindow
         return zones;
     }
 }
-
-
-
-

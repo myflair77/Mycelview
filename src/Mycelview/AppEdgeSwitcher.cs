@@ -34,7 +34,7 @@ internal sealed class AppEdgeSwitcher : IDisposable
         if(!settings.Enabled||owner.TestMode){Close();dwell.Reset();return;}
         foreach(var zone in zones){
             if(!markers.TryGetValue(zone.Id,out var marker))markers[zone.Id]=marker=new();
-            marker.Update(EdgeActivationService.SelectMonitor(monitors,zone.Monitor,zone.Edge),zone.Region(settings));
+            marker.Update(EdgeActivationService.SelectMonitor(monitors,zone.Monitor,zone.Edge),zone.Region(settings),EdgeRegionPalette.Get(settings,monitors,zone.Id.ToString()));
         }
         if(!owner.IsEnabled){Close();dwell.Reset();return;}
         if(GetAsyncKeyState(1)<0||GetAsyncKeyState(2)<0){dwell.Reset();return;}
@@ -43,11 +43,14 @@ internal sealed class AppEdgeSwitcher : IDisposable
         if(dwell.Update(active?.Id.ToString(),Environment.TickCount64,settings.DelayMs) && active!=null){
             var monitor=EdgeActivationService.SelectMonitor(monitors,active.Monitor,active.Edge);
             if(monitor==null)return;
-            Close();picker=new WindowPicker(active,AppWindows.List(active.AppPath),monitor);
-            picker.Show();shown=Environment.TickCount64;
+            Close();
+            var next=new WindowPicker(active,AppWindows.List(active.AppPath),monitor);
+            picker=next;
+            next.Closed+=(_,_)=>{if(ReferenceEquals(picker,next))picker=null;};
+            next.Show();shown=Environment.TickCount64;
         }
     }
-    void Close(){picker?.Close();picker=null;}
+    void Close(){var previous=picker;picker=null;previous?.Dismiss();}
     public void Dispose(){timer.Stop();timer.Tick-=Tick;Close();foreach(var marker in markers.Values)marker.Dispose();markers.Clear();}
     [StructLayout(LayoutKind.Sequential)] internal struct Point{public int X,Y;}
     [DllImport("user32.dll")] internal static extern bool GetCursorPos(out Point p);
@@ -63,6 +66,8 @@ internal sealed class WindowPicker : Window
     readonly AppWindowZone zone;
     readonly EdgeMonitor monitor;
     int page;
+    bool closing,closed;
+    internal bool IsDismissed => closing || closed;
     AppEdgeSwitcher.Point anchor;
     internal int ThumbnailCount => thumbnails.Count;
     internal WindowPicker(AppWindowZone zone,List<AppOpenWindow> windows,EdgeMonitor monitor)
@@ -75,7 +80,7 @@ internal sealed class WindowPicker : Window
         SetResourceReference(FontSizeProperty,"FontSize11");
         var root=new StackPanel{Margin=new Thickness(12)};
         var heading=new DockPanel{Margin=new Thickness(0,0,0,10)};
-        var close=new Button{Content="닫기"};DockPanel.SetDock(close,Dock.Right);heading.Children.Add(close);close.Click+=(_,_)=>Close();
+        var close=new Button{Content="닫기"};DockPanel.SetDock(close,Dock.Right);heading.Children.Add(close);close.Click+=(_,_)=>Dismiss();
         heading.Children.Add(new TextBlock{Text=zone.Name+" · 열린 창 "+windows.Count+"개",FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center});
         root.Children.Add(heading);root.Children.Add(cards);
         var navigation=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center};
@@ -85,12 +90,30 @@ internal sealed class WindowPicker : Window
         navigation.Children.Add(prev);navigation.Children.Add(pageLabel);navigation.Children.Add(next);root.Children.Add(navigation);
         Content=new Border{BorderBrush=Brushes.LightSkyBlue,BorderThickness=new Thickness(1),Child=root};
         Loaded+=(_,_)=>{Build();Place();};
-        Closed+=(_,_)=>Release();
-        Deactivated+=(_,_)=>Close();
-        PreviewKeyDown+=(_,e)=>{if(e.Key==System.Windows.Input.Key.Escape)Close();};
+
+        Deactivated+=(_,_)=>Dismiss();
+        PreviewKeyDown+=(_,e)=>{if(e.Key==System.Windows.Input.Key.Escape)Dismiss();};
+    }
+    internal void Dismiss()
+    {
+        if(closing || closed)return;
+        closing=true;
+        Close();
+    }
+    protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+    {
+        closing=true;
+        base.OnClosing(e);
+        if(e.Cancel)closing=false;
+    }
+    protected override void OnClosed(EventArgs e)
+    {
+        closed=true;Release();slots.Clear();
+        base.OnClosed(e);
     }
     void Place()
     {
+        if(IsDismissed)return;
         UpdateLayout();
         var hwnd=new WindowInteropHelper(this).Handle;
         var scale=PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice??Matrix.Identity;
@@ -107,6 +130,7 @@ internal sealed class WindowPicker : Window
     readonly List<(IntPtr Handle,Border Preview)> slots=[];
     void Build()
     {
+        if(IsDismissed)return;
         Release();cards.Children.Clear();slots.Clear();
         pageLabel.Text=$" {page+1} / {Math.Max(1,(windows.Count+3)/4)} ";
         if(windows.Count==0)cards.Children.Add(new TextBlock{Text="이 앱의 열린 창이 없습니다.",Margin=new Thickness(12)});
@@ -117,13 +141,14 @@ internal sealed class WindowPicker : Window
             panel.Children.Add(preview);
             panel.Children.Add(new TextBlock{Text=item.Title,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new Thickness(2,6,2,2)});
             var button=new Button{Content=panel,Width=250,Padding=new Thickness(4),Margin=new Thickness(2),ToolTip=item.Title};
-            button.Click+=(_,_)=>{Close();AppWindows.Activate(item.Handle);};
+            button.Click+=(_,_)=>{Dismiss();AppWindows.Activate(item.Handle);};
             cards.Children.Add(button);slots.Add((item.Handle,preview));
         }
         UpdateLayout();Place();
     }
     void UpdateThumbnails()
     {
+        if(IsDismissed)return;
         Release();
         var dest=new WindowInteropHelper(this).Handle;
         var transform=PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice??Matrix.Identity;
@@ -144,7 +169,7 @@ internal sealed class WindowPicker : Window
     void Release(){foreach(var thumb in thumbnails)DwmUnregisterThumbnail(thumb);thumbnails.Clear();}
     internal bool ContainsCursor()
     {
-        return AppEdgeSwitcher.GetCursorPos(out var p)&&GetWindowRect(new WindowInteropHelper(this).Handle,out var r)&&p.X>=r.Left-16&&p.X<=r.Right+16&&p.Y>=r.Top-16&&p.Y<=r.Bottom+16;
+        return !IsDismissed && AppEdgeSwitcher.GetCursorPos(out var p)&&GetWindowRect(new WindowInteropHelper(this).Handle,out var r)&&p.X>=r.Left-16&&p.X<=r.Right+16&&p.Y>=r.Top-16&&p.Y<=r.Bottom+16;
     }
     [StructLayout(LayoutKind.Sequential)] struct Size{public int Width,Height;}
     [DllImport("dwmapi.dll")]static extern int DwmQueryThumbnailSourceSize(IntPtr thumbnail,out Size size);
@@ -156,6 +181,3 @@ internal sealed class WindowPicker : Window
     [DllImport("user32.dll")]static extern bool GetWindowRect(IntPtr hwnd,out Rect rect);
     [DllImport("user32.dll")]static extern bool SetWindowPos(IntPtr hwnd,IntPtr after,int x,int y,int w,int h,uint flags);
 }
-
-
-

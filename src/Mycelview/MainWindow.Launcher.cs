@@ -61,7 +61,7 @@ public partial class MainWindow
         void Add(string title,Action action,bool enabled=true) { var entry=new MenuItem{Header=title,IsEnabled=enabled};entry.Click+=(_,_)=>action();menu.Items.Add(entry); }
         Add("실행",()=>LaunchFavorite(button,new()));
         Add("수정…",()=>EditLauncher(item));
-        if(item.Kind is "App" or "Browser") Add("화면 가장자리 구간 지정…",()=>{try{OpenEdgeActivationSettings(item);}catch(Exception error){ViewModel.Status="구간 지정 실패 · "+error.Message;}});
+        if(item.Kind is "App" or "Browser" or "Website") Add(item.Kind=="Website"?"브라우저 창의 가장자리 구간 지정…":"화면 가장자리 구간 지정…",()=>{try{OpenEdgeActivationSettings(item);}catch(Exception error){ViewModel.Status="구간 지정 실패 · "+error.Message;}});
         menu.Items.Add(new Separator());
         var siblings=ViewModel.LauncherFavorites.Where(x=>x.Kind==item.Kind).ToList();
         var index=siblings.IndexOf(item);
@@ -167,8 +167,3 @@ public partial class MainWindow
         ViewModel.Save();
     }
 }
-
-
-
-
-

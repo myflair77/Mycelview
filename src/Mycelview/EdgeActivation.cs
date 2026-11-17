@@ -9,6 +9,8 @@ public sealed class EdgeActivationSettings
     public bool Enabled { get; set; } = true;
     public string Edge { get; set; } = "Left";
     public int DelayMs { get; set; } = 100;
+    public const double DefaultOpacityPercent = 35;
+    public double OpacityPercent { get; set; } = DefaultOpacityPercent;
     private int? thicknessPixels;
     public int ThicknessPixels { get => thicknessPixels ?? (ThicknessScale is int scale ? Math.Clamp(scale, 1, 5) * 4 : 10); set => thicknessPixels = value; }
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
@@ -16,7 +18,7 @@ public sealed class EdgeActivationSettings
     public int StartPercent { get; set; } = 50;
     public int EndPercent { get; set; } = 100;
     public string Monitor { get; set; } = "Automatic";
-    public EdgeActivationSettings Normalize() => new() { AppZones = (AppZones ?? []).Where(z => z != null && !string.IsNullOrWhiteSpace(z.AppPath)).Select(z => z.Normalized()).ToList(), Enabled = Enabled, ThicknessPixels = Math.Clamp(ThicknessPixels, 2, 30), StartPercent = Math.Clamp(StartPercent, 0, 99), EndPercent = Math.Clamp(EndPercent, Math.Clamp(StartPercent, 0, 99) + 1, 100), Edge = Edge is "Right" or "Top" or "Bottom" ? Edge : "Left", DelayMs = Math.Clamp(DelayMs, 100, 5000), Monitor = string.IsNullOrWhiteSpace(Monitor) || Monitor is "Leftmost" or "Rightmost" or "Topmost" or "Bottommost" ? "Automatic" : Monitor };
+    public EdgeActivationSettings Normalize() => new() { AppZones = (AppZones ?? []).Where(z => z != null && !string.IsNullOrWhiteSpace(z.AppPath)).Select(z => z.Normalized()).ToList(), Enabled = Enabled, OpacityPercent = double.IsFinite(OpacityPercent) ? Math.Clamp(OpacityPercent,0,100) : DefaultOpacityPercent, ThicknessPixels = Math.Clamp(ThicknessPixels, 2, 30), StartPercent = Math.Clamp(StartPercent, 0, 99), EndPercent = Math.Clamp(EndPercent, Math.Clamp(StartPercent, 0, 99) + 1, 100), Edge = Edge is "Right" or "Top" or "Bottom" ? Edge : "Left", DelayMs = Math.Clamp(DelayMs, 100, 5000), Monitor = string.IsNullOrWhiteSpace(Monitor) || Monitor is "Leftmost" or "Rightmost" or "Topmost" or "Bottommost" ? "Automatic" : Monitor };
 }
 internal sealed record EdgeMonitor(string Device, int Left, int Top, int Right, int Bottom, bool Primary)
 {
@@ -42,6 +44,7 @@ internal sealed class EdgeActivationService : IDisposable
     private readonly DispatcherTimer timer = new() { Interval = TimeSpan.FromMilliseconds(40) };
     private readonly EdgeDwell dwell = new();
     private readonly EdgeActivationMarker marker = new();
+    private readonly List<EdgeActivationMarker> additionalMarkers = [];
     private List<EdgeMonitor> monitors = [];
     private long refreshed;
     private string configuration = "";
@@ -78,15 +81,39 @@ internal sealed class EdgeActivationService : IDisposable
         var s = window.ViewModel.EdgeActivation;
         string key = $"{s.Enabled}|{s.Edge}|{s.DelayMs}|{s.Monitor}|{s.StartPercent}|{s.EndPercent}";
         if (key != configuration) { configuration = key; dwell.Reset(); }
-        if (!s.Enabled || window.TestMode) { marker.Update(null, s); dwell.Reset(); return; }
+        if (!s.Enabled || window.TestMode) { marker.Update(null, s); foreach(var extra in additionalMarkers)extra.Update(null,s); dwell.Reset(); return; }
         long now = Environment.TickCount64;
         if (monitors.Count == 0 || now - refreshed > 2000) { monitors = GetMonitors(); refreshed = now; }
         var monitor = SelectMonitor(monitors, s.Monitor, s.Edge);
-        marker.Update(monitor, s);
+        var visible=VisibleMarkerRanges(s,monitors);
+        while(additionalMarkers.Count<Math.Max(0,visible.Count-1))additionalMarkers.Add(new());
+        var color=EdgeRegionPalette.Get(s,monitors,"Mycelview");
+        for(int i=0;i<=additionalMarkers.Count;i++){
+            var display=i==0?marker:additionalMarkers[i-1];
+            if(i>=visible.Count){display.Update(null,s);continue;}
+            var range=s.Normalize();range.StartPercent=visible[i].Start;range.EndPercent=visible[i].End;
+            display.Update(monitor,range,color);
+        }
         if (!window.IsEnabled || GetAsyncKeyState(1) < 0 || GetAsyncKeyState(2) < 0) { dwell.Reset(); return; }
         if (AppEdgeSwitcher.Matches(s, monitors, out _)) { dwell.Reset(); return; }
         string? zone = monitor != null && GetCursorPos(out var point) && InRange(monitor, s, point.X, point.Y) ? monitor.Device + s.Edge : null;
         if (dwell.Update(zone, now, s.DelayMs) && !window.IsActive) Reveal();
+    }
+    internal static List<(int Start,int End)> VisibleMarkerRanges(EdgeActivationSettings settings,List<EdgeMonitor> monitors)
+    {
+        var selected=SelectMonitor(monitors,settings.Monitor,settings.Edge);
+        var ranges=new List<(int Start,int End)>{(settings.StartPercent,settings.EndPercent)};
+        foreach(var zone in settings.AppZones??[]){
+            if(zone.Edge!=settings.Edge||SelectMonitor(monitors,zone.Monitor,zone.Edge)?.Device!=selected?.Device)continue;
+            var remaining=new List<(int Start,int End)>();
+            foreach(var range in ranges){
+                if(zone.EndPercent<=range.Start||zone.StartPercent>=range.End){remaining.Add(range);continue;}
+                if(zone.StartPercent>range.Start)remaining.Add((range.Start,zone.StartPercent));
+                if(zone.EndPercent<range.End)remaining.Add((zone.EndPercent,range.End));
+            }
+            ranges=remaining;
+        }
+        return ranges;
     }
     private void Reveal()
     {
@@ -98,7 +125,7 @@ internal sealed class EdgeActivationService : IDisposable
         try { BringWindowToTop(hwnd); SetForegroundWindow(hwnd); window.Activate(); }
         finally { if (attached) AttachThreadInput(current, foreground, false); }
     }
-    public void Dispose() { timer.Stop(); timer.Tick -= Tick; marker.Dispose(); }
+    public void Dispose() { timer.Stop(); timer.Tick -= Tick; marker.Dispose(); foreach(var extra in additionalMarkers)extra.Dispose();additionalMarkers.Clear(); }
     internal static List<EdgeMonitor> GetMonitors()
     {
         var result = new List<EdgeMonitor>();
@@ -128,5 +155,3 @@ internal sealed class EdgeActivationService : IDisposable
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint from, uint to, bool attach);
 }
-
-
