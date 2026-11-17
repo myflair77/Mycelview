@@ -56,6 +56,11 @@ internal static class LauncherTests
         Check(LauncherCatalog.Filter(discovered," ALPHA ").Single().Name=="Alpha","Case insensitive name search");
         Check(LauncherCatalog.Filter(discovered,"한글").Count()==1,"Korean name search");
         Check(LauncherCatalog.FromDrop([exe,exe,Path.Combine(catalogRoot,"ignore.txt"),catalogRoot]).Count==1,"Drop rejects documents and directories, deduplicates paths");
+        var packaged=new LauncherFavorite{Name="ChatGPT",Target=@"shell:AppsFolder\OpenAI.Codex_2p2nqsd0c76g0!App"};
+        foreach(var query in new[]{"ChatGPT","챗지피티","Codex","코덱스"})
+            Check(LauncherCatalog.Filter([packaged],query).Count()==1,"Packaged app search alias: "+query);
+        var packagedStart=LauncherService.Prepare(packaged);
+        Check(packagedStart.ArgumentList.Count==1&&packagedStart.ArgumentList[0]==packaged.Target,"Packaged app shell launch target");
         var actualCatalog=await Task.Run(()=>LauncherCatalog.Discover());
         File.WriteAllText(Path.Combine(output,"catalog-summary.txt"),$"Discovered {actualCatalog.Count} shortcuts; {LauncherService.Browsers().Count-1} installed browsers.");
         Check(StateStore.Parse("{}").LauncherFavorites.Count==0,"Legacy settings");

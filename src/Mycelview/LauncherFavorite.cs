@@ -35,6 +35,14 @@ internal static class LauncherService
             return start;
         }
         if (item.Kind != "App" && item.Kind != "Browser") throw new InvalidDataException("등록 종류를 선택하세요.");
+        if(item.Target.StartsWith(@"shell:AppsFolder\",StringComparison.OrdinalIgnoreCase)){
+            var id=item.Target[@"shell:AppsFolder\".Length..];
+            if(!System.Text.RegularExpressions.Regex.IsMatch(id,@"^[A-Za-z0-9_.-]+![A-Za-z0-9_.-]+$"))
+                throw new InvalidDataException("설치 앱 식별자가 올바르지 않습니다.");
+            var start=new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"explorer.exe")){UseShellExecute=true};
+            start.ArgumentList.Add(item.Target);
+            return start;
+        }
         if (!File.Exists(item.Target) || !(new[]{".exe",".lnk",".appref-ms"}).Contains(Path.GetExtension(item.Target),StringComparer.OrdinalIgnoreCase))
             throw new InvalidDataException("프로그램 실행 파일 또는 바로가기를 선택하세요.");
         return new(item.Target) { UseShellExecute=true, WorkingDirectory=Path.GetDirectoryName(item.Target) ?? "" };
