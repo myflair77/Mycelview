@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace Mycelview;
@@ -9,7 +9,7 @@ public partial class MainWindow
     internal Window CreateSearchOptionsWindow()
     {
         var options = ViewModel.Search.Options;
-        var dialog = new Window { Title = "검색 옵션", Owner = this, Width = Math.Min(560 * TextScale.Percent / 100d, SystemParameters.WorkArea.Width - 40), SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner, MaxHeight = SystemParameters.WorkArea.Height - 40 };
+        var dialog = new Window { Title = "검색 옵션", Owner = this, Width = Math.Min(560 * TextScale.Percent / 100d, SystemParameters.WorkArea.Width - 40), SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.CanResize, WindowStartupLocation = WindowStartupLocation.CenterOwner, MaxHeight = SystemParameters.WorkArea.Height - 40 };
         dialog.SetResourceReference(BackgroundProperty, "SurfaceBrush");
         dialog.SetResourceReference(ForegroundProperty, "TextBrush");
         var panel = new StackPanel { Margin = new Thickness(20) };

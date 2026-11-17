@@ -7,7 +7,7 @@ public partial class MainWindow
     {
         CloseCardEnlargement();
         var saved=ViewModel.Enlargement;
-        var dialog=new Window { Owner=this, Title="카드 자동 확대 설정", Icon=Icon, Width=480, SizeToContent=SizeToContent.Height, ResizeMode=ResizeMode.NoResize, WindowStartupLocation=WindowStartupLocation.CenterOwner };
+        var dialog=new Window { Owner=this, Title="카드 자동 확대 설정", Icon=Icon, Width=480, SizeToContent=SizeToContent.Height, ResizeMode=ResizeMode.CanResize, WindowStartupLocation=WindowStartupLocation.CenterOwner };
         dialog.SetResourceReference(BackgroundProperty,"SurfaceBrush");dialog.SetResourceReference(ForegroundProperty,"TextBrush");dialog.SetResourceReference(FontSizeProperty,"FontSize12");
         var panel=new StackPanel { Margin=new Thickness(20) };dialog.MaxHeight=SystemParameters.WorkArea.Height-40;dialog.Content=new ScrollViewer { Content=panel, VerticalScrollBarVisibility=ScrollBarVisibility.Auto };
         void Label(string value)=>panel.Children.Add(new TextBlock {Text=value,Margin=new Thickness(0,10,0,5),TextWrapping=TextWrapping.Wrap});

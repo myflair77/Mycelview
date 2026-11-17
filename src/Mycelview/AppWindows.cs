@@ -9,6 +9,7 @@ public sealed class AppWindowZone
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";
     public string AppPath { get; set; } = "";
+    public string WindowAppPath { get; set; } = "";
     public string Edge { get; set; } = "Left";
     public int StartPercent { get; set; }
     public int EndPercent { get; set; } = 25;
@@ -31,6 +32,18 @@ internal sealed record AppOpenWindow(IntPtr Handle,string Title,string AppPath)
 }
 internal static class AppWindows
 {
+    internal static string? WindowExecutable(string? path)
+    {
+        if(string.IsNullOrWhiteSpace(path))return path;
+        return MatchWindowExecutable(path,List());
+    }
+    internal static string? MatchWindowExecutable(string? path,List<AppOpenWindow> open)
+    {
+        if(open.Any(w=>StringComparer.OrdinalIgnoreCase.Equals(w.AppPath,path)))return path;
+        var candidates=open.Select(w=>w.AppPath).Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(p=>StringComparer.OrdinalIgnoreCase.Equals(Path.GetDirectoryName(p),Path.GetDirectoryName(path))).ToList();
+        return candidates.Count==1?candidates[0]:path;
+    }
     internal static List<AppOpenWindow> List(string? path=null,bool includeSelf=false)
     {
         var result=new List<AppOpenWindow>();
@@ -50,6 +63,18 @@ internal static class AppWindows
         },IntPtr.Zero);
         return result;
     }
+    internal static bool Exists(IntPtr handle)=>IsWindow(handle);
+    internal static bool RequestClose(AppOpenWindow window)
+    {
+        if(!IsWindow(window.Handle))return false;
+        GetWindowThreadProcessId(window.Handle,out var pid);
+        try{
+            using var process=Process.GetProcessById((int)pid);
+            if(!StringComparer.OrdinalIgnoreCase.Equals(process.MainModule?.FileName,window.AppPath))return false;
+            return PostMessage(window.Handle,0x0010,IntPtr.Zero,IntPtr.Zero);
+        }catch(Exception ex) when(ex is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException){return false;}
+    }
+    [DllImport("user32.dll",SetLastError=true)] private static extern bool PostMessage(IntPtr hwnd,uint message,IntPtr wParam,IntPtr lParam);
     internal static bool Activate(IntPtr hwnd)
     {
         if(!IsWindow(hwnd))return false;

@@ -62,6 +62,14 @@ internal static class LauncherTests
         var packagedStart=LauncherService.Prepare(packaged);
         Check(packagedStart.ArgumentList.Count==1&&packagedStart.ArgumentList[0]==packaged.Target,"Packaged app shell launch target");
         var actualCatalog=await Task.Run(()=>LauncherCatalog.Discover());
+        var installedChat=actualCatalog.FirstOrDefault(x=>x.Target.Contains("OpenAI.Codex_",StringComparison.OrdinalIgnoreCase));
+        if(installedChat!=null){
+            var resolved=PackagedApps.Executable(installedChat.Target);
+            Check(File.Exists(resolved)&&resolved.EndsWith("ChatGPT.exe",StringComparison.OrdinalIgnoreCase),"Installed ChatGPT package resolves to executable");
+            Check(LauncherEdgeSetup.Prepare(new(),installedChat).AppPath==resolved,"Packaged app can configure edgecall");
+            Check(installedChat.Icon!=null,"Packaged app loads executable icon");
+            File.WriteAllText(Path.Combine(output,"packaged-app.txt"),installedChat.Name+Environment.NewLine+resolved);
+        }
         File.WriteAllText(Path.Combine(output,"catalog-summary.txt"),$"Discovered {actualCatalog.Count} shortcuts; {LauncherService.Browsers().Count-1} installed browsers.");
         Check(StateStore.Parse("{}").LauncherFavorites.Count==0,"Legacy settings");
         var first=new WorkspaceTab{Name="첫 번째"};var second=new WorkspaceTab{Name="두 번째"};
@@ -113,6 +121,15 @@ internal static class LauncherTests
             Check(vm.LauncherGroups[0].Kind=="Website" && vm.LauncherGroups.Single(g=>g.Kind=="App").Items[0].Id==apps[1].Id,"Group and item order restored from backup");
             await vm.SwitchWorkspaceAsync(first.Id);
             Check(vm.LauncherGroups[0].Kind=="Website","Group order shared by workspaces");
+            var flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
+            var slots=(Dictionary<FrameworkElement,Rect>)typeof(MainWindow).GetField("launcherSlots",flags)!.GetValue(window)!;
+            var firstButton=new Button{DataContext=apps[0]};var secondButton=new Button{DataContext=apps[1]};
+            slots[firstButton]=new Rect(0,0,80,30);slots[secondButton]=new Rect(84,0,120,30);
+            typeof(MainWindow).GetField("launcherMoving",flags)!.SetValue(window,apps[0].Id);
+            typeof(MainWindow).GetMethod("PreviewLauncherMotion",flags)!.Invoke(window,[apps[1].Id,true]);
+            Check(secondButton.RenderTransform is TranslateTransform motion&&motion.HasAnimatedProperties,"Sibling icon animates to make room");
+            typeof(MainWindow).GetMethod("ResetLauncherMotion",flags)!.Invoke(window,null);
+            Check(slots.Count==0&&secondButton.RenderTransform==Transform.Identity,"Drag cancellation clears motion state");
             window.UpdateLayout();
             var bar=(Border)window.FindName("LauncherBar");var search=(Border)window.FindName("SearchArea");
             Check(bar.ActualHeight>0 && bar.TranslatePoint(new Point(),window).Y<search.TranslatePoint(new Point(),window).Y,"Bar above search");

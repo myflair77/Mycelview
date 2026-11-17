@@ -9,6 +9,36 @@ public partial class MainWindow
 {
     const string LauncherOrderFormat="Mycelview.LauncherOrder";
     sealed record LauncherOrderDrag(string? Group,Guid? Item);
+    readonly Dictionary<FrameworkElement,Rect> launcherSlots=[];
+    Guid? launcherMoving;
+    static IEnumerable<FrameworkElement> LauncherDescendants(DependencyObject parent){
+        for(int i=0;i<VisualTreeHelper.GetChildrenCount(parent);i++){
+            var child=VisualTreeHelper.GetChild(parent,i);
+            if(child is FrameworkElement element)yield return element;
+            foreach(var nested in LauncherDescendants(child))yield return nested;
+        }
+    }
+    void PreviewLauncherMotion(Guid target,bool after){
+        var order=launcherSlots.Keys.OrderBy(x=>launcherSlots[x].Left).ToList();
+        var moving=order.FirstOrDefault(x=>x.DataContext is LauncherFavorite f&&f.Id==launcherMoving);
+        var destination=order.FirstOrDefault(x=>x.DataContext is LauncherFavorite f&&f.Id==target);
+        if(moving==null||destination==null||moving==destination)return;
+        double gap=order.Count>1?Math.Max(0,launcherSlots[order[1]].Left-launcherSlots[order[0]].Right):4;
+        double x=launcherSlots[order[0]].Left;
+        order.Remove(moving);order.Insert(order.IndexOf(destination)+(after?1:0),moving);
+        foreach(var element in order){
+            double delta=x-launcherSlots[element].Left;
+            if(element!=moving){
+                var old=element.RenderTransform as TranslateTransform;
+                if(old==null||Math.Abs(old.X-delta)>0.5){
+                    var transform=new TranslateTransform(old?.X??0,0);element.RenderTransform=transform;
+                    transform.BeginAnimation(TranslateTransform.XProperty,new System.Windows.Media.Animation.DoubleAnimation(delta,TimeSpan.FromMilliseconds(160)));
+                }
+            }
+            x+=launcherSlots[element].Width+gap;
+        }
+    }
+    void ResetLauncherMotion(){foreach(var element in launcherSlots.Keys)element.RenderTransform=Transform.Identity;launcherSlots.Clear();launcherMoving=null;}
     Point launcherPress;
     FrameworkElement? launcherSource;
     bool launcherDragging;
@@ -35,17 +65,24 @@ public partial class MainWindow
             for(var parent=VisualTreeHelper.GetParent(source);parent!=null;parent=VisualTreeHelper.GetParent(parent))
                 if(parent is Border {DataContext:LauncherGroup} border){visual=border;break;}
         }
+        if(payload.Item!=null){
+            launcherMoving=payload.Item;
+            var group=FileContextMenus.Parent<Border>(source);
+            while(group!=null&&group.DataContext is not LauncherGroup)group=FileContextMenus.Parent<Border>(VisualTreeHelper.GetParent(group));
+            if(group!=null)foreach(var element in LauncherDescendants(group).OfType<Button>().Where(b=>b.DataContext is LauncherFavorite))
+                launcherSlots[element]=new Rect(element.TranslatePoint(new Point(),WindowLayers),element.RenderSize);
+        }
         var layer=AdornerLayer.GetAdornerLayer(WindowLayers);
         var ghost=new LauncherGhost(WindowLayers,visual){IsHitTestVisible=false};
         layer?.Add(ghost);
-        var oldOpacity=visual.Opacity;visual.Opacity=0.3;
+        var oldOpacity=visual.Opacity;visual.Opacity=payload.Item!=null?0:0.3;
         void Follow(object s,GiveFeedbackEventArgs args){
             if(AppEdgeSwitcher.GetCursorPos(out var point))ghost.Move(PointFromScreen(new Point(point.X,point.Y)));
             args.UseDefaultCursors=true;
         }
         source.GiveFeedback+=Follow;
         try{DragDrop.DoDragDrop(source,new DataObject(LauncherOrderFormat,payload),DragDropEffects.Move);}
-        finally{source.GiveFeedback-=Follow;layer?.Remove(ghost);visual.Opacity=oldOpacity;ClearLauncherLine();Dispatcher.BeginInvoke(new Action(()=>launcherDragging=false));}
+        finally{source.GiveFeedback-=Follow;layer?.Remove(ghost);visual.Opacity=oldOpacity;ResetLauncherMotion();ClearLauncherLine();Dispatcher.BeginInvoke(new Action(()=>launcherDragging=false));}
     }
     private void LauncherOrderUp(object sender,MouseButtonEventArgs e){launcherSource=null;}
     void ClearLauncherLine(){if(launcherLine!=null)launcherLayer?.Remove(launcherLine);launcherLine=null;launcherLayer=null;}
@@ -61,6 +98,11 @@ public partial class MainWindow
         if(drag.Group!=null)return(groupElement,group.Kind,null,e.GetPosition(groupElement).X>=groupElement.ActualWidth/2);
         var moving=ViewModel.LauncherFavorites.FirstOrDefault(x=>x.Id==drag.Item);
         if(moving==null||moving.Kind!=group.Kind)return default;
+        if(launcherSlots.Count>0){
+            var pointer=e.GetPosition(WindowLayers);
+            var candidate=launcherSlots.FirstOrDefault(pair=>pointer.X>=pair.Value.Left&&pointer.X<=pair.Value.Right);
+            if(candidate.Key?.DataContext is LauncherFavorite favorite)return(candidate.Key,group.Kind,favorite,pointer.X>=candidate.Value.Left+candidate.Value.Width/2);
+        }
         if(itemElement?.DataContext is LauncherFavorite item)return(itemElement,group.Kind,item,e.GetPosition(itemElement).X>=itemElement.ActualWidth/2);
         return(groupElement,group.Kind,group.Items.LastOrDefault(),true);
     }
@@ -76,6 +118,7 @@ public partial class MainWindow
                 target.Item!=null && ViewModel.InsertLauncherItem(drag.Item!.Value,target.Item.Id,target.After);
             if(changed)ViewModel.Save();
         }else{
+            if(drag.Item!=null&&target.Item!=null)PreviewLauncherMotion(target.Item.Id,target.After);
             launcherLayer=AdornerLayer.GetAdornerLayer(target.Element);
             if(launcherLayer!=null){launcherLine=new OrderLine(target.Element,target.After);launcherLayer.Add(launcherLine);}
             var scroll=FileContextMenus.Parent<ScrollViewer>(target.Element);

@@ -10,6 +10,7 @@ public partial class MainWindow
         error="";
         foreach(var z in zones){
             if(string.IsNullOrWhiteSpace(z.Name)||!File.Exists(z.AppPath)||!Path.GetExtension(z.AppPath).Equals(".exe",StringComparison.OrdinalIgnoreCase)){error="앱 구간의 실행 파일(.exe)을 선택하세요.";return false;}
+            if(!string.IsNullOrWhiteSpace(z.WindowAppPath)&&(!File.Exists(z.WindowAppPath)||!Path.GetExtension(z.WindowAppPath).Equals(".exe",StringComparison.OrdinalIgnoreCase))){error="연결된 창의 앱을 찾을 수 없습니다. 열린 창에서 다시 선택하세요.";return false;}
             if(z.StartPercent<0||z.EndPercent>100||z.StartPercent>=z.EndPercent){error="앱 구간의 시작 위치는 끝 위치보다 앞이어야 합니다.";return false;}
         }
         var monitors=EdgeActivationService.GetMonitors();
@@ -58,15 +59,33 @@ public partial class MainWindow
             if(z.AppPath.Length>0&&!choices.Any(x=>StringComparer.OrdinalIgnoreCase.Equals(x.Path,z.AppPath)))choices.Add(new(z.Name,z.AppPath));
             var app=new ComboBox{ItemsSource=choices,DisplayMemberPath="Name",SelectedItem=choices.FirstOrDefault(x=>StringComparer.OrdinalIgnoreCase.Equals(x.Path,z.AppPath)),ToolTip="현재 열린 앱 또는 설치된 브라우저 선택"};
             top.Children.Add(app);
-            app.SelectionChanged+=(_,_)=>{if(app.SelectedItem is BrowserChoice choice){z.Name=choice.Name;z.AppPath=choice.Path;selector.Items.Refresh();}};
+            app.SelectionChanged+=(_,_)=>{if(app.SelectedItem is BrowserChoice choice){z.Name=choice.Name;z.AppPath=choice.Path;z.WindowAppPath="";selector.Items.Refresh();}};
             var browse=new Button{Content="파일에서 선택…",HorizontalAlignment=HorizontalAlignment.Left,Margin=new Thickness(0,5,0,5)};
             panel.Children.Add(browse);browse.Click+=(_,_)=>{
                 var pick=new OpenFileDialog{Filter="앱 실행 파일|*.exe",CheckFileExists=true};
                 if(pick.ShowDialog(Window.GetWindow(parent))==true){var choice=new BrowserChoice(Path.GetFileNameWithoutExtension(pick.FileName),pick.FileName);choices.Add(choice);app.ItemsSource=null;app.ItemsSource=choices;app.SelectedItem=choice;}
             };
+            var windowTarget=new ComboBox{DisplayMemberPath="Name",Margin=new Thickness(0,4,0,8),ToolTip="창이 감지되지 않으면 대상 앱을 먼저 열고 여기에서 해당 창을 선택하세요. 실행 바로가기는 유지하고, 선택한 창의 실제 프로그램을 엣지콜에 연결합니다. 저장해야 적용됩니다."};
+            panel.Children.Add(new TextBlock{Text="호출할 창 연결",Margin=new Thickness(0,4,0,0)});
+            panel.Children.Add(windowTarget);
+            bool loadingWindows=false;
+            void LoadWindows(){
+                loadingWindows=true;
+                var entries=new List<BrowserChoice>{new("자동 인식","")};
+                entries.AddRange(AppWindows.List().Select(w=>new BrowserChoice(w.AppName+" · "+w.Title,w.AppPath)));
+                if(z.WindowAppPath.Length>0&&!entries.Any(c=>StringComparer.OrdinalIgnoreCase.Equals(c.Path,z.WindowAppPath)))
+                    entries.Add(new(Path.GetFileNameWithoutExtension(z.WindowAppPath)+" (현재 열린 창 없음)",z.WindowAppPath));
+                windowTarget.ItemsSource=entries;
+                windowTarget.SelectedItem=entries.FirstOrDefault(c=>StringComparer.OrdinalIgnoreCase.Equals(c.Path,z.WindowAppPath))??entries[0];
+                loadingWindows=false;
+            }
+            windowTarget.DropDownOpened+=(_,_)=>LoadWindows();
+            windowTarget.SelectionChanged+=(_,_)=>{if(!loadingWindows&&windowTarget.SelectedItem is BrowserChoice selected)z.WindowAppPath=selected.Path;};
+            app.SelectionChanged+=(_,_)=>LoadWindows();
+            LoadWindows();
             string[] edges=["Left","Right","Top","Bottom"];
-            var edge=new ComboBox{ItemsSource=new[]{"왼쪽 경계","오른쪽 경계","위쪽 경계","아래쪽 경계"},SelectedIndex=Math.Max(0,Array.IndexOf(edges,z.Edge))};panel.Children.Add(edge);
-            var monitor=new ComboBox{DisplayMemberPath="Value",SelectedValuePath="Key",Margin=new Thickness(0,5,0,5)};panel.Children.Add(monitor);
+            var edge=new ComboBox{ItemsSource=new[]{"왼쪽 경계","오른쪽 경계","위쪽 경계","아래쪽 경계"},SelectedIndex=Math.Max(0,Array.IndexOf(edges,z.Edge))};
+            var monitor=new ComboBox{DisplayMemberPath="Value",SelectedValuePath="Key",Margin=new Thickness(0,5,0,5)};panel.Children.Add(monitor);panel.Children.Add(edge);
             void Monitors(){
                 var entries=new List<KeyValuePair<string,string>>{new("Automatic","가장 "+new[]{"왼쪽","오른쪽","위쪽","아래쪽"}[edge.SelectedIndex]+" 모니터 (자동)")};
                 entries.AddRange(EdgeActivationService.GetMonitors().Select(m=>new KeyValuePair<string,string>(m.Device,m.Label)));

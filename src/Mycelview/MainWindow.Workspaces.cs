@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -34,7 +34,7 @@ public partial class MainWindow
     { try { await action(); } catch (Exception ex) { MessageBox.Show(this, ex.Message, "작업공간", MessageBoxButton.OK, MessageBoxImage.Information); } }
     private string? WorkspaceName(string title, string initial)
     {
-        var dialog = new Window { Owner = this, Title = title, Icon = Icon, Width = 400, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var dialog = new Window { Owner = this, Title = title, Icon = Icon, Width = 400, SizeToContent = SizeToContent.Height, ResizeMode = ResizeMode.CanResize, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         dialog.SetResourceReference(BackgroundProperty, "SurfaceBrush"); dialog.SetResourceReference(ForegroundProperty, "TextBrush");
         var panel = new StackPanel { Margin = new Thickness(18) }; dialog.Content = panel;
         panel.Children.Add(new TextBlock { Text = "탭마다 폴더·즐겨찾기·메모를 따로 저장합니다.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,0,0,12) });

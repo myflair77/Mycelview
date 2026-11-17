@@ -12,10 +12,10 @@ public partial class MainWindow
     {
         var saved = ViewModel.EdgeActivation.Normalize();
         if(favorite != null) LauncherEdgeSetup.Prepare(saved,favorite);
-        var dialog = new Window { Owner = this, Icon = Icon, Title = "화면 가장자리 호출 설정", Width = 540, Height = 630, SizeToContent = SizeToContent.Manual, ResizeMode = ResizeMode.NoResize, WindowStartupLocation = WindowStartupLocation.CenterOwner };
+        var dialog = new Window { Owner = this, Icon = Icon, Title = "엣지콜(edgecall) 설정", Width = 540, Height = Math.Min(820, SystemParameters.WorkArea.Height - 40), MinHeight = 400, MinWidth = 500, SizeToContent = SizeToContent.Manual, ResizeMode = ResizeMode.CanResize, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         dialog.SetResourceReference(BackgroundProperty, "SurfaceBrush"); dialog.SetResourceReference(ForegroundProperty, "TextBrush");
         var panel = new StackPanel { Margin = new Thickness(20) }; dialog.MaxHeight = Math.Max(300, SystemParameters.WorkArea.Height - 40); dialog.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        var enabled = new CheckBox { Content = "화면 가장자리 호출 사용", IsChecked = saved.Enabled }; panel.Children.Add(enabled);
+        var enabled = new CheckBox { Content = "엣지콜(edgecall) 사용", ToolTip = "엣지콜은 지정한 화면 가장자리에 마우스를 두면 Mycelview를 앞으로 가져오거나 앱의 열린 창을 미리보기로 보여주는 기능입니다.", IsChecked = saved.Enabled }; panel.Children.Add(enabled);
         void Label(string value) => panel.Children.Add(new TextBlock { Text = value, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,12,0,5) });
 
         Label("작동 위치");

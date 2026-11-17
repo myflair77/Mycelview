@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -16,7 +16,7 @@ internal static class FileOperationDialogs
 {
     private static Window Dialog(Window owner, string title, double width = 520) => new()
     { Owner = owner, Title = title, Width = width, Icon = owner.Icon, SizeToContent = SizeToContent.Height, MaxHeight = 650,
-        WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize,
+        WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResize,
         Background = (System.Windows.Media.Brush)owner.FindResource("SurfaceBrush"), Foreground = (System.Windows.Media.Brush)owner.FindResource("TextBrush") };
     internal static CollisionDecision Conflict(Window owner, string source, string destination)
     {

@@ -15,6 +15,7 @@ internal sealed class AppEdgeSwitcher : IDisposable
     List<EdgeMonitor> monitors=[];
     long refreshed,shown;
     WindowPicker? picker;
+    readonly Dictionary<Guid,List<IntPtr>> windowOrders=[];
     EdgeActivationSettings? configuration;
     internal AppEdgeSwitcher(MainWindow owner){this.owner=owner;timer.Tick+=Tick;timer.Start();}
     internal static bool Matches(EdgeActivationSettings settings,List<EdgeMonitor> monitors,out AppWindowZone? zone)
@@ -44,7 +45,11 @@ internal sealed class AppEdgeSwitcher : IDisposable
             var monitor=EdgeActivationService.SelectMonitor(monitors,active.Monitor,active.Edge);
             if(monitor==null)return;
             Close();
-            var next=new WindowPicker(active,AppWindows.List(active.AppPath),monitor);
+            var listed=AppWindows.List(string.IsNullOrWhiteSpace(active.WindowAppPath)?AppWindows.WindowExecutable(active.AppPath):active.WindowAppPath);
+            if(windowOrders.TryGetValue(active.Id,out var order))listed=listed.OrderBy(w=>{int index=order.IndexOf(w.Handle);return index<0?int.MaxValue:index;}).ToList();
+            windowOrders[active.Id]=listed.Select(w=>w.Handle).ToList();
+            foreach(var id in windowOrders.Keys.Where(id=>!zones.Any(z=>z.Id==id)).ToArray())windowOrders.Remove(id);
+            var next=new WindowPicker(active,listed,monitor,items=>windowOrders[active.Id]=items.Select(w=>w.Handle).ToList());
             picker=next;
             next.Closed+=(_,_)=>{if(ReferenceEquals(picker,next))picker=null;};
             next.Show();shown=Environment.TickCount64;
@@ -65,14 +70,84 @@ internal sealed class WindowPicker : Window
     readonly TextBlock pageLabel=new(){VerticalAlignment=VerticalAlignment.Center};
     readonly AppWindowZone zone;
     readonly EdgeMonitor monitor;
+    readonly DispatcherTimer refresh=new(){Interval=TimeSpan.FromMilliseconds(250)};
+    readonly Action<List<AppOpenWindow>>? orderChanged;
+    bool dragging;
+    const string DragFormat="Mycelview.Edgecall.Window";
+    long lastPageDrag;
+    Border? movingCard;
+    readonly Dictionary<FrameworkElement,System.Windows.Point> motionSlots=[];
+    System.Windows.Vector grabOffset;
+    IntPtr movingHandle;
+    int motionIndex=-1;
+    void BeginMotion(IntPtr handle,System.Windows.Point pointer)
+    {
+        movingHandle=handle;
+        movingCard=cards.Children.OfType<Border>().FirstOrDefault(c=>c.Tag is IntPtr id&&id==handle);
+        if(movingCard==null)return;
+        motionSlots.Clear();
+        foreach(var card in cards.Children.OfType<FrameworkElement>())motionSlots[card]=card.TranslatePoint(new System.Windows.Point(),cards);
+        grabOffset=pointer-movingCard.TranslatePoint(new System.Windows.Point(),this);
+        var movingSlot=slots.FindIndex(s=>s.Handle==handle);
+        if(movingSlot>=0){var slot=slots[movingSlot];slots.RemoveAt(movingSlot);slots.Add(slot);Release();}
+        movingCard.IsHitTestVisible=false;
+        Panel.SetZIndex(movingCard,10);
+        CompositionTarget.Rendering+=MotionFrame;
+    }
+    void MotionFrame(object? sender,EventArgs e)
+    {
+        if(movingCard==null||IsDismissed||!AppEdgeSwitcher.GetCursorPos(out var cursor))return;
+        var pointer=PointFromScreen(new System.Windows.Point(cursor.X,cursor.Y));
+        var home=movingCard.TranslatePoint(new System.Windows.Point(),this);
+        var transform=movingCard.RenderTransform as TranslateTransform;
+        var basePoint=new System.Windows.Point(home.X-(transform?.X??0),home.Y-(transform?.Y??0));
+        movingCard.RenderTransform=new TranslateTransform(pointer.X-grabOffset.X-basePoint.X,pointer.Y-grabOffset.Y-basePoint.Y);
+        var local=TranslatePoint(pointer,cards);
+        var order=motionSlots.Keys.ToList();
+        int destination=order.FindIndex(c=>new System.Windows.Rect(motionSlots[c],c.RenderSize).Contains(local));
+        if(destination>=0&&destination!=motionIndex){
+            motionIndex=destination;
+            var remaining=order.Where(c=>c!=movingCard).ToList();remaining.Insert(destination,movingCard);
+            var locations=motionSlots.Values.ToArray();
+            for(int i=0;i<remaining.Count;i++){
+                var card=remaining[i];if(card==movingCard)continue;
+                var origin=motionSlots[card];var previous=card.RenderTransform as TranslateTransform;
+                var move=new TranslateTransform(previous?.X??0,previous?.Y??0);card.RenderTransform=move;
+                var duration=TimeSpan.FromMilliseconds(160);
+                move.BeginAnimation(TranslateTransform.XProperty,new System.Windows.Media.Animation.DoubleAnimation(locations[i].X-origin.X,duration));
+                move.BeginAnimation(TranslateTransform.YProperty,new System.Windows.Media.Animation.DoubleAnimation(locations[i].Y-origin.Y,duration));
+            }
+        }
+        UpdateThumbnails();
+    }
+    void EndMotion(bool commit)
+    {
+        CompositionTarget.Rendering-=MotionFrame;
+        if(commit&&movingCard!=null&&motionIndex>=0){
+            var order=motionSlots.Keys.ToList();
+            var target=(IntPtr)order[motionIndex].Tag;
+            int original=order.IndexOf(movingCard);
+            if(MoveWindow(windows,movingHandle,target,motionIndex>original))orderChanged?.Invoke(windows);
+        }
+        foreach(var card in motionSlots.Keys){card.RenderTransform=Transform.Identity;card.IsHitTestVisible=true;Panel.SetZIndex(card,0);}
+        motionSlots.Clear();movingCard=null;motionIndex=-1;
+    }
     int page;
+    internal static bool MoveWindow(List<AppOpenWindow> items,IntPtr source,IntPtr target,bool after)
+    {
+        int from=items.FindIndex(w=>w.Handle==source),to=items.FindIndex(w=>w.Handle==target);
+        if(from<0||to<0||from==to)return false;
+        var item=items[from];items.RemoveAt(from);
+        to=items.FindIndex(w=>w.Handle==target)+(after?1:0);
+        items.Insert(to,item);return true;
+    }
     bool closing,closed;
     internal bool IsDismissed => closing || closed;
     AppEdgeSwitcher.Point anchor;
     internal int ThumbnailCount => thumbnails.Count;
-    internal WindowPicker(AppWindowZone zone,List<AppOpenWindow> windows,EdgeMonitor monitor)
+    internal WindowPicker(AppWindowZone zone,List<AppOpenWindow> windows,EdgeMonitor monitor,Action<List<AppOpenWindow>>? orderChanged=null)
     {
-        this.zone=zone;this.windows=windows;this.monitor=monitor;
+        this.zone=zone;this.windows=windows;this.monitor=monitor;this.orderChanged=orderChanged;
         AppEdgeSwitcher.GetCursorPos(out anchor);
         WindowStyle=WindowStyle.None;ResizeMode=ResizeMode.NoResize;ShowInTaskbar=false;ShowActivated=false;Topmost=true;
         Width=540;SizeToContent=SizeToContent.Height;
@@ -83,16 +158,31 @@ internal sealed class WindowPicker : Window
         var close=new Button{Content="닫기"};DockPanel.SetDock(close,Dock.Right);heading.Children.Add(close);close.Click+=(_,_)=>Dismiss();
         heading.Children.Add(new TextBlock{Text=zone.Name+" · 열린 창 "+windows.Count+"개",FontWeight=FontWeights.SemiBold,VerticalAlignment=VerticalAlignment.Center});
         root.Children.Add(heading);root.Children.Add(cards);
+        cards.AllowDrop=true;
+        cards.PreviewDragOver+=(_,e)=>{if(dragging&&movingCard!=null){e.Effects=DragDropEffects.Move;e.Handled=true;}};
+        cards.PreviewDrop+=(_,e)=>{if(dragging&&movingCard!=null){e.Effects=DragDropEffects.Move;e.Handled=true;}};
         var navigation=new StackPanel{Orientation=Orientation.Horizontal,HorizontalAlignment=HorizontalAlignment.Center};
         var prev=new Button{Content="◀",ToolTip="이전 창 목록"};var next=new Button{Content="▶",ToolTip="다음 창 목록"};
         prev.Click+=(_,_)=>{if(page>0){page--;Build();}};
         next.Click+=(_,_)=>{if((page+1)*4<windows.Count){page++;Build();}};
+        void PageDrag(Button control,int delta){
+            control.AllowDrop=true;
+            control.DragOver+=(_,e)=>{
+                if(!dragging||!e.Data.GetDataPresent(DragFormat))return;
+                e.Effects=DragDropEffects.Move;e.Handled=true;
+                if(Environment.TickCount64-lastPageDrag<650)return;
+                int destination=Math.Clamp(page+delta,0,Math.Max(0,(windows.Count-1)/4));
+                if(destination!=page){EndMotion(false);page=destination;lastPageDrag=Environment.TickCount64;Build();}
+            };
+        }
+        PageDrag(prev,-1);PageDrag(next,1);
         navigation.Children.Add(prev);navigation.Children.Add(pageLabel);navigation.Children.Add(next);root.Children.Add(navigation);
         Content=new Border{BorderBrush=Brushes.LightSkyBlue,BorderThickness=new Thickness(1),Child=root};
-        Loaded+=(_,_)=>{Build();Place();};
+        Loaded+=(_,_)=>{Build();Place();refresh.Start();};
+        refresh.Tick+=(_,_)=>{if(IsDismissed||dragging)return;if(windows.RemoveAll(w=>!AppWindows.Exists(w.Handle))>0){page=Math.Min(page,Math.Max(0,(windows.Count-1)/4));Build();}};
 
-        Deactivated+=(_,_)=>Dismiss();
-        PreviewKeyDown+=(_,e)=>{if(e.Key==System.Windows.Input.Key.Escape)Dismiss();};
+        Deactivated+=(_,_)=>{if(!dragging)Dismiss();};
+        PreviewKeyDown+=(_,e)=>{if(!dragging&&e.Key==System.Windows.Input.Key.Escape)Dismiss();};
     }
     internal void Dismiss()
     {
@@ -108,7 +198,7 @@ internal sealed class WindowPicker : Window
     }
     protected override void OnClosed(EventArgs e)
     {
-        closed=true;Release();slots.Clear();
+        closed=true;EndMotion(false);refresh.Stop();Release();slots.Clear();
         base.OnClosed(e);
     }
     void Place()
@@ -137,24 +227,65 @@ internal sealed class WindowPicker : Window
         foreach(var item in windows.Skip(page*4).Take(4))
         {
             var panel=new StackPanel();
-            var preview=new Border{Width=238,Height=126,Background=Brushes.WhiteSmoke,Child=new TextBlock{Text="미리보기를 사용할 수 없는 창\n(클릭하여 전환)",TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};
+            var preview=new Border{Width=230,Height=126,Background=Brushes.WhiteSmoke,Child=new TextBlock{Text="미리보기를 사용할 수 없는 창\n(클릭하여 전환)",TextAlignment=TextAlignment.Center,VerticalAlignment=VerticalAlignment.Center}};
             panel.Children.Add(preview);
             panel.Children.Add(new TextBlock{Text=item.Title,TextTrimming=TextTrimming.CharacterEllipsis,Margin=new Thickness(2,6,2,2)});
-            var button=new Button{Content=panel,Width=250,Padding=new Thickness(4),Margin=new Thickness(2),ToolTip=item.Title};
-            button.Click+=(_,_)=>{Dismiss();AppWindows.Activate(item.Handle);};
-            cards.Children.Add(button);slots.Add((item.Handle,preview));
+            var button=new Button{Content=panel,Width=244,Padding=new Thickness(4),Margin=new Thickness(1),Background=Brushes.Transparent,BorderBrush=Brushes.Transparent,ToolTip=item.Title};
+            button.Click+=(_,_)=>{if(!dragging){Dismiss();AppWindows.Activate(item.Handle);}};
+            System.Windows.Point? start=null;
+            button.PreviewMouseLeftButtonDown+=(_,e)=>start=e.GetPosition(this);
+            button.PreviewMouseLeftButtonUp+=(_,_)=>start=null;
+            button.PreviewMouseMove+=(_,e)=>{
+                if(start is not {} origin||e.LeftButton!=System.Windows.Input.MouseButtonState.Pressed||dragging)return;
+                var point=e.GetPosition(this);
+                if(Math.Abs(point.X-origin.X)<SystemParameters.MinimumHorizontalDragDistance&&Math.Abs(point.Y-origin.Y)<SystemParameters.MinimumVerticalDragDistance)return;
+                start=null;dragging=true;e.Handled=true;button.ReleaseMouseCapture();
+                BeginMotion(item.Handle,origin);
+                try{var effect=DragDrop.DoDragDrop(button,new DataObject(DragFormat,item.Handle),DragDropEffects.Move);EndMotion(effect==DragDropEffects.Move);}
+                finally{EndMotion(false);dragging=false;if(!IsDismissed)Build();}
+            };
+            button.AllowDrop=true;
+            var normalBorder=button.BorderBrush;
+            button.DragOver+=(_,e)=>{
+                if(!dragging||!e.Data.GetDataPresent(DragFormat))return;
+                e.Handled=true;e.Effects=DragDropEffects.Move;
+                button.BorderBrush=Brushes.DodgerBlue;
+                button.BorderThickness=e.GetPosition(button).X<button.ActualWidth/2?new Thickness(3,1,1,1):new Thickness(1,1,3,1);
+            };
+            button.DragLeave+=(_,_)=>{button.BorderBrush=normalBorder;button.BorderThickness=new Thickness(1);};
+            button.Drop+=(_,e)=>{
+                if(!dragging||e.Data.GetData(DragFormat) is not IntPtr source)return;
+                e.Handled=true;
+                if(MoveWindow(windows,source,item.Handle,e.GetPosition(button).X>=button.ActualWidth/2))orderChanged?.Invoke(windows);
+            };
+            button.ToolTip=item.Title+"\n드래그하여 순서 변경 · 클릭하여 창 전환";
+            var tile=new Grid();
+            tile.RowDefinitions.Add(new RowDefinition{Height=new GridLength(26)});
+            tile.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});
+            Grid.SetRow(button,1);tile.Children.Add(button);
+            var closeWindow=new Button{Content="×",Width=24,Height=24,Padding=new Thickness(0),Margin=new Thickness(0,5,5,0),HorizontalAlignment=HorizontalAlignment.Right,VerticalAlignment=VerticalAlignment.Top,ToolTip="이 창 닫기",Background=Brushes.White};
+            System.Windows.Automation.AutomationProperties.SetName(closeWindow,"창 닫기 · "+item.Title);
+            closeWindow.Click+=(_,e)=>{e.Handled=true;if(!AppWindows.RequestClose(item))closeWindow.ToolTip="창을 닫을 수 없습니다. 해당 앱에서 직접 닫아주세요.";};
+            tile.Children.Add(new TextBlock{Text="창 미리보기",Foreground=Brushes.SlateGray,FontSize=11,Margin=new Thickness(9,5,30,0),VerticalAlignment=VerticalAlignment.Center});
+            tile.Children.Add(closeWindow);
+            var card=new Border{Tag=item.Handle,Width=250,Margin=new Thickness(2,3,2,3),CornerRadius=new CornerRadius(8),BorderThickness=new Thickness(1),BorderBrush=Brushes.LightSteelBlue,Background=Brushes.AliceBlue,Child=tile};
+            card.MouseEnter+=(_,_)=>card.BorderBrush=Brushes.DodgerBlue;
+            card.MouseLeave+=(_,_)=>card.BorderBrush=Brushes.LightSteelBlue;
+            cards.Children.Add(card);slots.Add((item.Handle,preview));
         }
         UpdateLayout();Place();
     }
     void UpdateThumbnails()
     {
         if(IsDismissed)return;
-        Release();
         var dest=new WindowInteropHelper(this).Handle;
         var transform=PresentationSource.FromVisual(this)?.CompositionTarget?.TransformToDevice??Matrix.Identity;
-        foreach(var (source,preview) in slots){
-            if(DwmRegisterThumbnail(dest,source,out var thumb)!=0)continue;
-            thumbnails.Add(thumb);
+        if(thumbnails.Count!=slots.Count){
+            Release();
+            foreach(var slot in slots){DwmRegisterThumbnail(dest,slot.Handle,out var handle);thumbnails.Add(handle);}
+        }
+        for(int index=0;index<slots.Count;index++){
+            var (source,preview)=slots[index];var thumb=thumbnails[index];if(thumb==IntPtr.Zero)continue;
             var p=transform.Transform(preview.TranslatePoint(new System.Windows.Point(),this));
             var w=preview.ActualWidth*transform.M11;var h=preview.ActualHeight*transform.M22;
             if(DwmQueryThumbnailSourceSize(thumb,out var size)==0 && size.Width>0 && size.Height>0){

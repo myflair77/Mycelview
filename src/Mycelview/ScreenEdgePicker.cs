@@ -48,8 +48,38 @@ internal static class ScreenEdgePicker
         var ordered=Enumerable.Range(0,zones.Count).GroupBy(i=>{
             var r=zones[i].Region;return (EdgeActivationService.SelectMonitor(monitors,r.Monitor,r.Edge)?.Device??r.Monitor)+"|"+r.Edge;
         });
+        var sequence=ordered.SelectMany(group=>group.OrderBy(i=>zones[i].Region.StartPercent).ThenBy(i=>zones[i].Region.EndPercent).ThenBy(i=>zones[i].Key)).ToList();
+        var neighbors=Enumerable.Range(0,zones.Count).Select(_=>new HashSet<int>()).ToArray();
         foreach(var group in ordered){
-            int color=0;foreach(int index in group.OrderBy(i=>zones[i].Region.StartPercent).ThenBy(i=>zones[i].Region.EndPercent).ThenBy(i=>zones[i].Key))result[index]=palette[color++%4];
+            var indices=group.OrderBy(i=>zones[i].Region.StartPercent).ThenBy(i=>zones[i].Region.EndPercent).ThenBy(i=>zones[i].Key).ToArray();
+            for(int n=0;n<indices.Length;n++){
+                result[indices[n]]=palette[n%4];
+                if(n>0){neighbors[indices[n]].Add(indices[n-1]);neighbors[indices[n-1]].Add(indices[n]);}
+            }
+        }
+        Rect? Segment(int index){
+            var r=zones[index].Region;
+            var m=EdgeActivationService.SelectMonitor(monitors,r.Monitor,r.Edge);
+            if(m==null)return null;
+            bool vertical=r.Edge is "Left" or "Right";
+            double start=(vertical?m.Bottom-m.Top:m.Right-m.Left)*r.StartPercent/100d;
+            double end=(vertical?m.Bottom-m.Top:m.Right-m.Left)*r.EndPercent/100d;
+            return vertical?new Rect(r.Edge=="Left"?m.Left:m.Right,m.Top+start,0,end-start)
+                :new Rect(m.Left+start,r.Edge=="Top"?m.Top:m.Bottom,end-start,0);
+        }
+        var segments=Enumerable.Range(0,zones.Count).Select(Segment).ToArray();
+        for(int i=0;i<zones.Count;i++)for(int j=0;j<i;j++){
+            if(segments[i] is Rect a&&segments[j] is Rect b&&a.IntersectsWith(b)){
+                neighbors[i].Add(j);neighbors[j].Add(i);
+            }
+        }
+        var assigned=new HashSet<int>();
+        foreach(int index in sequence){
+            var used=neighbors[index].Where(assigned.Contains).Select(i=>result[i].ToString()).ToHashSet();
+            if(used.Contains(result[index].ToString()))
+                result[index]=palette.FirstOrDefault(p=>!used.Contains(p.ToString()))
+                    ?? Enumerable.Range(1,zones.Count+1).Select(ZoneBrush).First(p=>!used.Contains(p.ToString()));
+            assigned.Add(index);
         }
         return result;
     }    internal static List<EdgePreviewZone> Zones(EdgeActivationSettings basic,IEnumerable<AppWindowZone> apps) => new[]{new EdgePreviewZone("Mycelview","Mycelview",basic)}.Concat(apps.Select(z=>new EdgePreviewZone(z.Id.ToString(),z.Name,z.Region(basic)))).ToList();

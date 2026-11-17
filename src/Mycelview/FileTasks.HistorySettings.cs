@@ -1,4 +1,4 @@
-﻿using System.Windows;
+using System.Windows;
 using System.Windows.Controls;
 namespace Mycelview;
 public sealed partial class FileTasks
@@ -6,7 +6,7 @@ public sealed partial class FileTasks
     internal void ShowHistorySettings()
     {
         if (Busy || history == null) return;
-        var window = new Window { Owner = Owner, Title = "실행 취소 기록 관리", Width = 460, SizeToContent = SizeToContent.Height, WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.NoResize, Icon = Owner.Icon };
+        var window = new Window { Owner = Owner, Title = "실행 취소 기록 관리", Width = 460, SizeToContent = SizeToContent.Height, WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResize, Icon = Owner.Icon };
         var panel = new StackPanel { Margin = new Thickness(20) }; window.Content = panel;
         panel.Children.Add(new TextBlock { Text = $"실행 취소 {history.Data.Undo.Count}개 · 다시 실행 {history.Data.Redo.Count}개\n보관 용량 {history.Usage / 1048576d:F1} MB", Margin = new Thickness(0,0,0,12) });
         panel.Children.Add(new TextBlock { Text = "최대 보관 용량 (MB)" });

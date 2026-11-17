@@ -61,7 +61,7 @@ public partial class MainWindow
         void Add(string title,Action action,bool enabled=true) { var entry=new MenuItem{Header=title,IsEnabled=enabled};entry.Click+=(_,_)=>action();menu.Items.Add(entry); }
         Add("실행",()=>LaunchFavorite(button,new()));
         Add("수정…",()=>EditLauncher(item));
-        if(item.Kind is "App" or "Browser" or "Website") Add(item.Kind=="Website"?"브라우저 창의 가장자리 구간 지정…":"화면 가장자리 구간 지정…",()=>{try{OpenEdgeActivationSettings(item);}catch(Exception error){ViewModel.Status="구간 지정 실패 · "+error.Message;}});
+        if(item.Kind is "App" or "Browser" or "Website") Add(item.Kind=="Website"?"브라우저 창 엣지콜 구간 지정…":"엣지콜 구간 지정…",()=>{try{OpenEdgeActivationSettings(item);}catch(Exception error){ViewModel.Status="구간 지정 실패 · "+error.Message;}});
         menu.Items.Add(new Separator());
         var siblings=ViewModel.LauncherFavorites.Where(x=>x.Kind==item.Kind).ToList();
         var index=siblings.IndexOf(item);
@@ -75,7 +75,7 @@ public partial class MainWindow
     private void EditLauncher(LauncherFavorite? original, string initialKind = "App")
     {
         var item=original?.Copy() ?? new LauncherFavorite { Kind = initialKind };
-        var dialog=new Window{Title=original==null?"앱·브라우저·사이트 즐겨찾기 추가":"앱·브라우저·사이트 즐겨찾기 수정",Owner=this,Width=560,SizeToContent=SizeToContent.Height,ResizeMode=ResizeMode.NoResize,WindowStartupLocation=WindowStartupLocation.CenterOwner,ShowInTaskbar=false};
+        var dialog=new Window{Title=original==null?"앱·브라우저·사이트 즐겨찾기 추가":"앱·브라우저·사이트 즐겨찾기 수정",Owner=this,Width=560,SizeToContent=SizeToContent.Height,ResizeMode=ResizeMode.CanResize,WindowStartupLocation=WindowStartupLocation.CenterOwner,ShowInTaskbar=false};
         dialog.SetResourceReference(FontSizeProperty,"FontSize11");
         dialog.SetResourceReference(BackgroundProperty,"SurfaceBrush");
         dialog.SetResourceReference(ForegroundProperty,"TextBrush");

@@ -5,7 +5,7 @@ internal static class LauncherEdgeSetup
 {
     internal static string Executable(LauncherFavorite favorite)
     {
-        var path=favorite.Target;
+        var path=PackagedApps.Executable(favorite.Target);
         if(favorite.Kind=="Website"){
             path=favorite.BrowserPath;
             if(string.IsNullOrWhiteSpace(path)){

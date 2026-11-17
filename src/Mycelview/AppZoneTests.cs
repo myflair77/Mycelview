@@ -10,12 +10,38 @@ internal static class AppZoneTests
     {
         void Check(bool value,string message){if(!value)throw new Exception(message);}
         EdgeActivationTests.Run();
+        var reordered=Enumerable.Range(1,6).Select(i=>new AppOpenWindow(new IntPtr(i),"Window "+i,"fixture.exe")).ToList();
+        Check(WindowPicker.MoveWindow(reordered,new IntPtr(1),new IntPtr(3),true),"Drag moves item after target");
+        Check(reordered.Select(w=>w.Handle.ToInt64()).SequenceEqual(new long[]{2,3,1,4,5,6}),"Forward reorder");
+        Check(WindowPicker.MoveWindow(reordered,new IntPtr(6),new IntPtr(2),false),"Drag across pages");
+        Check(reordered.Select(w=>w.Handle.ToInt64()).SequenceEqual(new long[]{6,2,3,1,4,5}),"Backward reorder");
+        Check(!WindowPicker.MoveWindow(reordered,new IntPtr(6),new IntPtr(6),false),"Self drop ignored");
+        Check(!WindowPicker.MoveWindow(reordered,new IntPtr(999),new IntPtr(6),false)&&reordered.Count==6,"Stale drag ignored");
         Check(ScreenEdgePicker.Position(0,540,1920,1080)==("Left",50),"Physical left edge midpoint");
         Check(ScreenEdgePicker.Position(1919,270,1920,1080)==("Right",25),"Physical right edge quarter");
         Check(ScreenEdgePicker.Position(960,0,1920,1080)==("Top",50),"Horizontal midpoint");
         Check(ScreenEdgePicker.Position(4000,-50,1920,1080,"Left")==("Left",0),"Clamp outside drag");
         Check(ScreenEdgePicker.Position(0,270,960,540)==("Left",50),"DPI-independent ratios");
         var exe=Environment.ProcessPath!;
+        var messengerLauncher=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),"AtMessenger7","Launcher.exe");
+        if(File.Exists(messengerLauncher)){
+            Check(AppWindows.WindowExecutable(messengerLauncher)!.EndsWith("AtMessengerMobileEdition.exe"),"Messenger launcher resolves to window process");
+            var messengerWindows=AppWindows.List(AppWindows.WindowExecutable(messengerLauncher));
+            File.WriteAllText(Path.Combine(output,"messenger-windows.txt"),"Detected windows: "+messengerWindows.Count);
+        }
+        Check(AppWindows.WindowExecutable(exe)==exe,"Ordinary apps retain exact process matching");
+        var launcher=Path.Combine(output,"launcher.exe");
+        var runtime=Path.Combine(output,"runtime.exe");
+        var helper=Path.Combine(output,"helper.exe");
+        var samples=new List<AppOpenWindow>{new(new IntPtr(10),"Runtime",runtime)};
+        Check(AppWindows.MatchWindowExecutable(launcher,samples)==runtime,"Generic launcher matches unique sibling window process");
+        samples.Add(new(new IntPtr(11),"Helper",helper));
+        Check(AppWindows.MatchWindowExecutable(launcher,samples)==launcher,"Ambiguous runtime requires explicit window selection");
+        Check(AppWindows.MatchWindowExecutable(runtime,samples)==runtime,"Exact process wins");
+        var linked=new AppWindowZone{Name="Linked",AppPath=exe,WindowAppPath=runtime};
+        var roundtrip=JsonSerializer.Deserialize<AppWindowZone>(JsonSerializer.Serialize(linked))!;
+        Check(roundtrip.WindowAppPath==runtime&&linked.Copy().WindowAppPath==runtime,"Window connection persists and clones");
+        Check(JsonSerializer.Deserialize<AppWindowZone>("{}")!.WindowAppPath=="","Legacy window connection defaults to automatic");
         var a=new AppWindowZone{Name="Test",AppPath=exe,StartPercent=0,EndPercent=25};
         var b=new AppWindowZone{Name="Test2",AppPath=exe,StartPercent=25,EndPercent=50};
         Check(MainWindow.ValidateAppZones([a,b],out _),"Adjacent zones allowed");
@@ -44,6 +70,14 @@ internal static class AppZoneTests
         Check(ScreenEdgePicker.MoveRange(30,50,80,[(60,80)])==(40,60),"Body cannot cross right neighbor");
         Check(ScreenEdgePicker.MoveRange(30,50,-80,[(0,20)])==(20,40),"Body cannot cross left neighbor");
         Check(ScreenEdgePicker.MoveRange(30,50,0,[(0,20),(60,80)])==(30,50),"Click without motion preserves range");
+        var cornerMonitor=new EdgeMonitor("corner",-1920,-1080,0,0,true);
+        foreach(var corner in new[]{("Left",0,"Top",0),("Right",0,"Top",75),("Left",75,"Bottom",0),("Right",75,"Bottom",75)}){
+            var cornerZones=new List<EdgePreviewZone>{
+                new("a","a",new(){Edge=corner.Item1,StartPercent=corner.Item2,EndPercent=corner.Item2+25}),
+                new("b","b",new(){Edge=corner.Item3,StartPercent=corner.Item4,EndPercent=corner.Item4+25})};
+            var cornerColors=ScreenEdgePicker.RegionColors(cornerZones,[cornerMonitor]);
+            Check(cornerColors[0].ToString()!=cornerColors[1].ToString(),"Different colors at corner "+corner);
+        }
         var colors=ScreenEdgePicker.RegionColors(previewZones,EdgeActivationService.GetMonitors());
         Check(colors[1].ToString()!=colors[2].ToString(),"Adjacent app ranges have different colors");
         var spatial=Enumerable.Range(0,5).Select(i=>new EdgePreviewZone(i.ToString(),i.ToString(),new EdgeActivationSettings{StartPercent=i*20,EndPercent=(i+1)*20})).Reverse().ToList();
@@ -86,6 +120,7 @@ internal static class AppZoneTests
             vm.EdgeActivation=settings;
             var owner=new MainWindow(vm){TestMode=true,Opacity=0,ShowActivated=false,ShowInTaskbar=false};owner.Show();
             var dialog=owner.CreateEdgeActivationDialog();
+            Check(dialog.ResizeMode==ResizeMode.CanResize&&dialog.Height==Math.Min(820,SystemParameters.WorkArea.Height-40),"Edgecall dialog is taller and resizable");
             var root=(System.Windows.Controls.DockPanel)dialog.Content;
             var tabs=root.Children.OfType<System.Windows.Controls.TabControl>().Single();
             Check(tabs.Items.Count==3,"Three simple setting categories");
@@ -125,6 +160,14 @@ internal static class AppZoneTests
             picker=new WindowPicker(a,windows.Where(x=>x.Handle==h1||x.Handle==h2).ToList(),EdgeActivationService.GetMonitors()[0]){Opacity=0,ShowActivated=false};
             picker.Show();picker.UpdateLayout();
             Check(picker.ThumbnailCount==2,"Native DWM thumbnails registered");
+            var beginMotion=typeof(WindowPicker).GetMethod("BeginMotion",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!;
+            var endMotion=typeof(WindowPicker).GetMethod("EndMotion",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!;
+            var movingField=typeof(WindowPicker).GetField("movingCard",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!;
+            beginMotion.Invoke(picker,[h1,new Point(20,20)]);
+            var moving=(System.Windows.Controls.Border)movingField.GetValue(picker)!;
+            Check(!moving.IsHitTestVisible&&System.Windows.Controls.Panel.GetZIndex(moving)==10,"Dragged card lifted above neighbors");
+            endMotion.Invoke(picker,[false]);
+            Check(moving.IsHitTestVisible&&moving.RenderTransform==System.Windows.Media.Transform.Identity&&movingField.GetValue(picker)==null,"Canceled drag restores card and releases animation state");
             int reentered=0;
             picker.Closing+=(_,_)=>{reentered++;picker.Dismiss();};
             picker.Dismiss();
@@ -139,6 +182,23 @@ internal static class AppZoneTests
                 repeated.Close();repeated.Dismiss();
                 Check(repeated.IsDismissed&&repeated.ThumbnailCount==0,"Repeated open/external-close cycle releases resources");
             }
+            void PumpClose(){
+                var frame=new System.Windows.Threading.DispatcherFrame();
+                var timer=new System.Windows.Threading.DispatcherTimer{Interval=TimeSpan.FromMilliseconds(100)};
+                timer.Tick+=(_,_)=>{timer.Stop();frame.Continue=false;};timer.Start();
+                System.Windows.Threading.Dispatcher.PushFrame(frame);
+            }
+            bool cancelClose=true;
+            first.Closing+=(_,e)=>e.Cancel=cancelClose;
+            var targetWindow=windows.Single(w=>w.Handle==h1);
+            Check(AppWindows.RequestClose(targetWindow),"Native close request accepted");
+            PumpClose();
+            Check(AppWindows.Exists(h1)&&AppWindows.Exists(h2),"Canceled close preserves both windows");
+            cancelClose=false;
+            Check(AppWindows.RequestClose(targetWindow),"Second close request accepted");
+            PumpClose();
+            Check(!AppWindows.Exists(h1)&&AppWindows.Exists(h2),"Only selected window closed");
+            Check(!AppWindows.RequestClose(targetWindow),"Stale close target rejected");
             second.Close();Check(!AppWindows.List(exe,true).Any(x=>x.Handle==h2),"Closed window removed");
             Check(!AppWindows.Activate(IntPtr.Zero),"Invalid activation rejected");
             File.WriteAllText(Path.Combine(output,"passed.txt"),"Zone ranges, overlap, persistence, cloned settings, native window enumeration, process matching, DWM registration and disposal passed. No user's window activated.");
