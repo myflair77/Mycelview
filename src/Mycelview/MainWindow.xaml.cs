@@ -7,6 +7,7 @@ using System.Windows.Media;
 namespace Mycelview;
 public partial class MainWindow : Window
 {
+    private BrowserTabsBridge? browserTabsBridge;
     public MainViewModel ViewModel { get; }
     internal FileContextMenus FileMenus { get; }
     internal FilePreviewController FilePreview { get; }
@@ -28,9 +29,9 @@ public partial class MainWindow : Window
             if ((e.Key == Key.Z || e.Key == Key.Y) && Keyboard.Modifiers == ModifierKeys.Control && FileContextMenus.Parent<System.Windows.Controls.Primitives.TextBoxBase>(e.OriginalSource as DependencyObject) == null)
             { e.Handled = true; if (e.Key == Key.Y) await ViewModel.FileTasks.RedoAsync(); else await ViewModel.FileTasks.UndoAsync(); }
         };
-        Loaded += (_, _) => { ApplySearchSort(); UpdateFileSectionPins(); if (!TestMode && edgeActivation == null) { edgeActivation = new(this); appEdgeSwitcher = new(this); } };
+        Loaded += (_, _) => { ApplySearchSort(); UpdateFileSectionPins(); if (!TestMode && edgeActivation == null) { browserTabsBridge = new(Dispatcher); edgeActivation = new(this); appEdgeSwitcher = new(this); } };
         vm.WorkspaceChanged += UpdateFileSectionPins;
-        Closed += (_, _) => { edgeActivation?.Dispose(); appEdgeSwitcher?.Dispose(); };
+        Closed += (_, _) => { edgeActivation?.Dispose(); appEdgeSwitcher?.Dispose(); browserTabsBridge?.Dispose(); };
         SearchPopup.Opened += (_, _) => UpdateSearchPopupPlacement();
         SizeChanged += (_, _) => UpdateSearchPopupPlacement();
         LocationChanged += (_, _) => { SkinPicker.IsDropDownOpen = false; UpdateSearchPopupPlacement(); };
@@ -45,6 +46,20 @@ public partial class MainWindow : Window
         Deactivated += (_, _) => { if (!TestMode) ViewModel.Search.HideResults(); };
         AddHandler(System.Windows.Controls.Primitives.Thumb.DragCompletedEvent, new System.Windows.Controls.Primitives.DragCompletedEventHandler((sender, e) =>
         { if (e.OriginalSource is GridSplitter) SavePaneLayout(); }), true);
+    }
+    private void UnregisterAllFavorites(object sender, RoutedEventArgs e)
+    {
+        bool folders = (sender as FrameworkElement)?.Tag as string == "Folders";
+        var items = (folders ? ViewModel.Folders : ViewModel.Favorites).ToArray();
+        if (items.Length == 0) return;
+        string kind = folders ? "폴더" : "파일";
+        if (MessageBox.Show(this, $"모든 {kind}를 즐겨찾기 해제하시겠습니까?",
+            "모두 등록 해제", MessageBoxButton.OKCancel, MessageBoxImage.Question,
+            MessageBoxResult.Cancel) != MessageBoxResult.OK) return;
+        CloseCardEnlargement();
+        FilePreview.Close();
+        foreach (var card in items) ViewModel.Remove(card);
+        ViewModel.Save();
     }
     private void ToggleSingleClickPreview(object sender, RoutedEventArgs e)
     {

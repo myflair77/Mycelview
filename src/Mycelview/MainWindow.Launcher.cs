@@ -89,6 +89,11 @@ public partial class MainWindow
         body.Children.Add(catalogPanel);
         var catalogTitle=new TextBlock{Text="목록에서 선택",FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,5)};
         catalogPanel.Children.Add(catalogTitle);
+        var sourceRow=new DockPanel{Margin=new Thickness(0,0,0,6)};
+        var refreshRunning=new Button{Content="새로고침",ToolTip="현재 열린 프로그램 목록을 다시 읽습니다."};
+        DockPanel.SetDock(refreshRunning,Dock.Right);sourceRow.Children.Add(refreshRunning);
+        var sourceMode=new ComboBox{ItemsSource=new[]{"설치된 앱","현재 열린 프로그램"},SelectedIndex=0,Margin=new Thickness(0,0,6,0)};
+        sourceRow.Children.Add(sourceMode);catalogPanel.Children.Add(sourceRow);
         var filter=new TextBox{ToolTip="앱 이름으로 검색",Margin=new Thickness(0,0,0,5)};
         System.Windows.Automation.AutomationProperties.SetName(filter,"앱 이름 검색");
         catalogPanel.Children.Add(filter);
@@ -103,20 +108,27 @@ public partial class MainWindow
         var line=new FrameworkElementFactory(typeof(StackPanel));line.SetValue(StackPanel.OrientationProperty,Orientation.Horizontal);
         var icon=new FrameworkElementFactory(typeof(Image));icon.SetValue(Image.WidthProperty,16d);icon.SetValue(Image.HeightProperty,16d);icon.SetValue(Image.MarginProperty,new Thickness(3,3,8,3));icon.SetBinding(Image.SourceProperty,new System.Windows.Data.Binding("Icon"));line.AppendChild(icon);
         var text=new FrameworkElementFactory(typeof(TextBlock));text.SetValue(TextBlock.VerticalAlignmentProperty,VerticalAlignment.Center);text.SetBinding(TextBlock.TextProperty,new System.Windows.Data.Binding("Name"));line.AppendChild(text);
+        var hintText=new FrameworkElementFactory(typeof(TextBlock));hintText.SetValue(TextBlock.MarginProperty,new Thickness(8,0,0,0));hintText.SetValue(TextBlock.ForegroundProperty,System.Windows.Media.Brushes.Gray);hintText.SetBinding(TextBlock.TextProperty,new System.Windows.Data.Binding("CatalogHint"));line.AppendChild(hintText);
         template.VisualTree=line;list.ItemTemplate=template;catalogPanel.Children.Add(list);
-        List<LauncherFavorite> apps=[];
+        List<LauncherFavorite> apps=[],runningApps=[];
         var detectedBrowsers=LauncherService.Browsers().Where(x=>x.Path.Length>0)
             .Select(x=>new LauncherFavorite{Name=x.Name,Target=x.Path,Kind="Browser"}).ToList();
         bool catalogLoaded=false,dialogClosed=false;
         void RefreshCatalog()
         {
-            var source=kind.SelectedIndex==1?detectedBrowsers:apps;
+            var source=sourceMode.SelectedIndex==1?runningApps:kind.SelectedIndex==1?detectedBrowsers:apps;
             var matches=LauncherCatalog.Filter(source,filter.Text).ToList();
             list.ItemsSource=matches;
-            catalogTitle.Text=kind.SelectedIndex==1?"설치된 브라우저 선택":"앱 이름을 검색하고 선택하세요";
-            catalogStatus.Text=kind.SelectedIndex==0&&!catalogLoaded?"시작 메뉴와 바탕화면의 앱을 찾는 중…":
+            catalogTitle.Text=sourceMode.SelectedIndex==1?"열린 창을 선택하세요":kind.SelectedIndex==1?"설치된 브라우저 선택":"앱 이름을 검색하고 선택하세요";
+            catalogStatus.Text=sourceMode.SelectedIndex==0&&kind.SelectedIndex==0&&!catalogLoaded?"시작 메뉴와 바탕화면의 앱을 찾는 중…":
                 matches.Count==0?"검색 결과가 없습니다. 아래에서 파일을 직접 선택할 수도 있습니다.":$"{matches.Count}개 · 선택하면 이름과 실행 경로가 채워집니다.";
         }
+        void ReloadRunning(){
+            try{runningApps=LauncherCatalog.RunningApps();RefreshCatalog();}
+            catch(Exception ex){catalogStatus.Text="열린 프로그램 목록을 읽지 못했습니다: "+ex.Message;}
+        }
+        sourceMode.SelectionChanged+=(_,_)=>{refreshRunning.IsEnabled=sourceMode.SelectedIndex==1;if(sourceMode.SelectedIndex==1)ReloadRunning();else RefreshCatalog();};
+        refreshRunning.IsEnabled=false;refreshRunning.Click+=(_,_)=>ReloadRunning();
         filter.TextChanged+=(_,_)=>RefreshCatalog();
         dialog.Closed+=(_,_)=>dialogClosed=true;
         dialog.Loaded+=async (_,_)=>{

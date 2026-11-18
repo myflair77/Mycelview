@@ -1,0 +1,21 @@
+{
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyifCj6Y+J1VTtlyaEiKWgzIQ/pQ5Kv8mJbk00H23w1U74hTlGbbkzecipGxRKNUaxsgmC8uCLBKzwbXPy71AfFTxGrkMj68vi5V7ZEchoFBafmhEhlhKAhij4ZbQYtuvYiS4ZiteiGuYAT7nwdvdFymaJWtnuPuHaOPUTrbnGb3BteFk5dyc4LfsNcn7kFWhDFwHZbrtAUFaqlXioxyBadCnr/clalP2EJ+k3MSq13Q/1UbNr9regR3z//wZ1bTA/BNd+z+VmjQoYJWh6LpJHuvSvV+ZpTtyTORZE2hL62swHkO6pDzXyeyJAhjFYioO0RvtbH5L80Snt0pS59i/sQIDAQAB",
+  "description": "엣지콜에서 브라우저 창별 탭을 확인하고 전환합니다.",
+  "incognito": "not_allowed",
+  "permissions": [
+    "tabs",
+    "nativeMessaging",
+    "favicon",
+    "alarms"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "manifest_version": 3,
+  "version": "1.0.0",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Mycelview 탭 연결"
+  },
+  "name": "Mycelview 탭 연결"
+}

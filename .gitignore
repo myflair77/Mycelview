@@ -5,3 +5,5 @@
 artifacts/
 *.user
 *.suo
+browser-integration/host/
+browser-integration/native-host.json

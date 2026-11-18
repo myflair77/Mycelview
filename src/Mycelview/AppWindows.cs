@@ -9,6 +9,7 @@ public sealed class AppWindowZone
     public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = "";
     public string AppPath { get; set; } = "";
+    public string SwitchMode { get; set; } = "Mouse";
     public string WindowAppPath { get; set; } = "";
     public string Edge { get; set; } = "Left";
     public int StartPercent { get; set; }
@@ -32,6 +33,13 @@ internal sealed record AppOpenWindow(IntPtr Handle,string Title,string AppPath)
 }
 internal static class AppWindows
 {
+    internal static string ExecutableIdentity(string path){
+        var directory=Path.GetDirectoryName(path)??"";
+        if(System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(directory),@"^\d+(?:\.\d+){1,5}$"))
+            directory=Path.GetDirectoryName(directory)??directory;
+        return Path.Combine(directory,Path.GetFileName(path));
+    }
+    internal static bool SameExecutable(string a,string b)=>StringComparer.OrdinalIgnoreCase.Equals(ExecutableIdentity(a),ExecutableIdentity(b));
     internal static string? WindowExecutable(string? path)
     {
         if(string.IsNullOrWhiteSpace(path))return path;
@@ -39,7 +47,7 @@ internal static class AppWindows
     }
     internal static string? MatchWindowExecutable(string? path,List<AppOpenWindow> open)
     {
-        if(open.Any(w=>StringComparer.OrdinalIgnoreCase.Equals(w.AppPath,path)))return path;
+        var identityMatch=open.FirstOrDefault(w=>path!=null&&SameExecutable(w.AppPath,path));if(identityMatch!=null)return identityMatch.AppPath;
         var candidates=open.Select(w=>w.AppPath).Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(p=>StringComparer.OrdinalIgnoreCase.Equals(Path.GetDirectoryName(p),Path.GetDirectoryName(path))).ToList();
         return candidates.Count==1?candidates[0]:path;
@@ -57,7 +65,7 @@ internal static class AppWindows
             try{
                 using var process=Process.GetProcessById((int)pid);
                 var app=process.MainModule?.FileName;
-                if(app!=null&&(path==null||StringComparer.OrdinalIgnoreCase.Equals(app,path)))result.Add(new(hwnd,title.ToString(),app));
+                if(app!=null&&(path==null||SameExecutable(app,path)))result.Add(new(hwnd,title.ToString(),app));
             }catch(Exception ex) when(ex is System.ComponentModel.Win32Exception or InvalidOperationException or ArgumentException or NotSupportedException){}
             return true;
         },IntPtr.Zero);

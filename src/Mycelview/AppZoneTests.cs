@@ -10,6 +10,13 @@ internal static class AppZoneTests
     {
         void Check(bool value,string message){if(!value)throw new Exception(message);}
         EdgeActivationTests.Run();
+        Check(WindowPicker.FitScale(1000,800,500,600)==0.5&&WindowPicker.FitScale(1000,800,1200,400)==0.5&&WindowPicker.FitScale(1000,800,2000,1600)==1,"Preview scales uniformly to either dimension without enlarging");
+        Check(WindowPicker.PageSize==20&&WindowPicker.PageCount(0)==1&&WindowPicker.PageCount(20)==1&&WindowPicker.PageCount(21)==2&&WindowPicker.PageCount(40)==2&&WindowPicker.PageCount(41)==3,"Twenty previews per page at boundaries");
+        Check(CardViewModel.FolderHeading(@"C:\Work",@"C:\Work\Child")=="> Child","Folder heading descendant");
+        Check(CardViewModel.FolderHeading(@"C:\Work\Child",@"C:\Work")=="< Work","Folder heading ancestor");
+        Check(CardViewModel.FolderHeading(@"C:\Work",@"C:\Workshop")=="— Workshop","Folder heading respects directory boundaries");
+        Check(CardViewModel.FolderHeading(@"C:\Work",@"c:\work\")=="","Folder heading omits duplicate current folder");
+        Check(CardViewModel.FolderHeading(@"C:\Work",@"C:\")==@"< C:\","Folder heading handles drive root");
         var reordered=Enumerable.Range(1,6).Select(i=>new AppOpenWindow(new IntPtr(i),"Window "+i,"fixture.exe")).ToList();
         Check(WindowPicker.MoveWindow(reordered,new IntPtr(1),new IntPtr(3),true),"Drag moves item after target");
         Check(reordered.Select(w=>w.Handle.ToInt64()).SequenceEqual(new long[]{2,3,1,4,5,6}),"Forward reorder");
@@ -42,6 +49,20 @@ internal static class AppZoneTests
         var roundtrip=JsonSerializer.Deserialize<AppWindowZone>(JsonSerializer.Serialize(linked))!;
         Check(roundtrip.WindowAppPath==runtime&&linked.Copy().WindowAppPath==runtime,"Window connection persists and clones");
         Check(JsonSerializer.Deserialize<AppWindowZone>("{}")!.WindowAppPath=="","Legacy window connection defaults to automatic");
+        Check(new EdgeActivationSettings().SwitchMode=="Mouse"&&new AppWindowZone().SwitchMode=="Mouse","All new regions default to hover switching");
+        var modeState=new EdgeActivationSettings{SwitchMode="Click",AppZones=[new(){AppPath=exe,SwitchMode="Mouse"}]};
+        var modes=JsonSerializer.Deserialize<EdgeActivationSettings>(JsonSerializer.Serialize(modeState))!.Normalize();
+        Check(modes.SwitchMode=="Click"&&modes.AppZones[0].SwitchMode=="Mouse","Per-region switch modes persist");
+        var hoverCalls=new List<IntPtr>();
+        var modeMonitor=EdgeActivationService.GetMonitors()[0];
+        var hoverPicker=new WindowPicker(new(){SwitchMode="Mouse"},[],modeMonitor,null,h=>hoverCalls.Add(h));
+        hoverPicker.HoverWindow(new IntPtr(10));hoverPicker.HoverWindow(new IntPtr(10));hoverPicker.HoverWindow(new IntPtr(11));
+        Check(hoverCalls.SequenceEqual(new[]{new IntPtr(10),new IntPtr(11)}),"Hover switches each newly targeted window once without clicking");
+        hoverPicker.Dismiss();hoverPicker.HoverWindow(new IntPtr(12));
+        Check(hoverCalls.Count==2,"Dismissed preview never activates");
+        var clickPicker=new WindowPicker(new(){SwitchMode="Click"},[],modeMonitor,null,h=>hoverCalls.Add(h));
+        clickPicker.HoverWindow(new IntPtr(12));clickPicker.Dismiss();
+        Check(hoverCalls.Count==2,"Click mode ignores hover");
         var a=new AppWindowZone{Name="Test",AppPath=exe,StartPercent=0,EndPercent=25};
         var b=new AppWindowZone{Name="Test2",AppPath=exe,StartPercent=25,EndPercent=50};
         Check(MainWindow.ValidateAppZones([a,b],out _),"Adjacent zones allowed");
@@ -168,6 +189,30 @@ internal static class AppZoneTests
             Check(!moving.IsHitTestVisible&&System.Windows.Controls.Panel.GetZIndex(moving)==10,"Dragged card lifted above neighbors");
             endMotion.Invoke(picker,[false]);
             Check(moving.IsHitTestVisible&&moving.RenderTransform==System.Windows.Media.Transform.Identity&&movingField.GetValue(picker)==null,"Canceled drag restores card and releases animation state");
+            var twenty=new WindowPicker(a,Enumerable.Range(0,20).Select(i=>new AppOpenWindow(h1,"Preview "+i,exe)).ToList(),EdgeActivationService.GetMonitors()[0]){Opacity=0,ShowActivated=false};
+            twenty.Show();twenty.UpdateLayout();
+            var cardGrid=(System.Windows.Controls.Primitives.UniformGrid)typeof(WindowPicker).GetField("cards",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.GetValue(twenty)!;
+            Check(cardGrid.Columns==5&&cardGrid.Children.Count==20,"Twenty previews use five columns and four rows");
+            var scale=System.Windows.PresentationSource.FromVisual(twenty)!.CompositionTarget.TransformToDevice;
+            var screen=EdgeActivationService.GetMonitors()[0];
+            Check(twenty.ActualWidth*scale.M11<=screen.Right-screen.Left&&twenty.ActualHeight*scale.M22<=screen.Bottom-screen.Top,"Twenty previews fit monitor bounds");
+            foreach(var card in cardGrid.Children.OfType<FrameworkElement>()){
+                var bounds=card.TransformToAncestor(twenty).TransformBounds(new Rect(0,0,card.ActualWidth,card.ActualHeight));
+                Check(bounds.Left>=-1&&bounds.Top>=-1&&bounds.Right<=twenty.ActualWidth+1&&bounds.Bottom<=twenty.ActualHeight+1,"Every card fully inside preview window");
+            }
+            twenty.Dismiss();
+            foreach(int count in new[]{1,4,5,12,20,21}){
+                var compact=new WindowPicker(a,Enumerable.Range(0,count).Select(i=>new AppOpenWindow(h1,"Preview "+i,exe)).ToList(),new EdgeMonitor("test-small",-30000,-30000,-29200,-29400,false)){Opacity=0,ShowActivated=false};
+                compact.Show();compact.UpdateLayout();
+                var compactGrid=(System.Windows.Controls.Primitives.UniformGrid)typeof(WindowPicker).GetField("cards",System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic)!.GetValue(compact)!;
+                var compactScale=System.Windows.PresentationSource.FromVisual(compact)!.CompositionTarget.TransformToDevice;
+                Check(compact.ActualWidth*compactScale.M11<=800&&compact.ActualHeight*compactScale.M22<=600,"Small monitor fit for "+count+" windows");
+                foreach(var child in compactGrid.Children.OfType<FrameworkElement>()){
+                    var rect=child.TransformToAncestor(compact).TransformBounds(new Rect(0,0,child.ActualWidth,child.ActualHeight));
+                    Check(rect.Left>=-1&&rect.Top>=-1&&rect.Right<=compact.ActualWidth+1&&rect.Bottom<=compact.ActualHeight+1,"No clipped card for "+count+" windows");
+                }
+                compact.Dismiss();
+            }
             int reentered=0;
             picker.Closing+=(_,_)=>{reentered++;picker.Dismiss();};
             picker.Dismiss();

@@ -1,0 +1,13 @@
+<!doctype html><html lang="ko"><meta charset="utf-8"><title>Mycelview 브라우저 탭 연결</title>
+<style>body{font:16px/1.8 "Segoe UI",sans-serif;color:#243344;background:#f5f8fc;max-width:850px;margin:48px auto;padding:24px}main{background:white;border:1px solid #dae4f0;border-radius:16px;padding:32px}h1{color:#168bff}code{background:#edf3fa;padding:3px 7px;border-radius:5px}.box{padding:16px;background:#edf6ff;border-radius:10px}li{margin:10px 0}</style>
+<main><h1>파일부터 앱까지, 내 작업을 한곳에서.</h1><h2>브라우저 탭 연결을 마무리하세요</h2>
+<p>Mycelview와 연결 프로그램 설치는 끝났습니다. 크롬·엣지·웨일에서 탭 아이콘과 제목을 표시하고 탭 클릭으로 전환하려면, 사용하는 브라우저마다 아래 단계를 한 번 진행하세요.</p>
+<ol><li>브라우저 주소창에 <b>크롬</b> <code>chrome://extensions</code>, <b>엣지</b> <code>edge://extensions</code>, <b>웨일</b> <code>whale://extensions</code> 중 해당 주소를 입력합니다.</li>
+<li><b>개발자 모드</b>를 켜고 <b>압축해제된 확장 프로그램 로드</b>를 선택합니다.</li>
+<li>아래 폴더를 선택합니다. 설치 마지막 화면에서 '확장 프로그램 폴더 열기'로 확인할 수 있습니다.</li></ol>
+<div class="box"><strong>선택할 폴더</strong><br><code id="folder">Mycelview 설치 폴더의 browser-extension</code></div>
+<p>확장 목록에서 <b>Mycelview 탭 연결</b>이 켜져 있으면 완료입니다. Mycelview가 실행 중이면 자동 연결되며, 확장 팝업의 '다시 연결'로 재시도할 수 있습니다.</p>
+<p>이전에 개발 폴더에서 추가한 확장은 제거하고 이 설치 폴더에서 다시 추가하세요. 브라우저 프로필이 여러 개라면 사용하는 프로필마다 추가합니다. 이후 Mycelview를 업데이트하면 확장 관리 화면에서 새로고침하세요.</p>
+<h2>기존 데이터는 유지됩니다</h2><p>설정과 즐겨찾기는 기존 저장 위치를 그대로 사용합니다. 앱을 제거해도 이 데이터와 실제 파일·폴더는 삭제하지 않습니다.</p>
+<h2>참고</h2><p>시크릿·InPrivate 창은 제외합니다. 연결은 같은 Windows 사용자 계정 안에서 이루어지며 외부 서버로 탭 정보를 보내지 않습니다. 처음 연결 시 동일한 제목의 창이 여러 개라면 해당 창을 한 번 직접 선택해 주세요.</p></main>
+<script>const path=decodeURIComponent(new URL("./browser-extension",location.href).pathname);document.getElementById("folder").textContent=path.slice(1).split("/").join(String.fromCharCode(92));</script></html>

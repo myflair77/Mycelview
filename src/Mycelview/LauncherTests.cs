@@ -61,6 +61,12 @@ internal static class LauncherTests
             Check(LauncherCatalog.Filter([packaged],query).Count()==1,"Packaged app search alias: "+query);
         var packagedStart=LauncherService.Prepare(packaged);
         Check(packagedStart.ArgumentList.Count==1&&packagedStart.ArgumentList[0]==packaged.Target,"Packaged app shell launch target");
+        var running=LauncherCatalog.RunningApps();
+        foreach(var candidate in running)Check(LauncherService.Prepare(candidate)!=null,"Running app has valid launch target");
+        var titleFixture=new LauncherFavorite{Name="Example",Target=exe,CatalogHint="열린 문서 제목"};
+        Check(LauncherCatalog.Filter([titleFixture],"문서 제목").Count()==1,"Running apps searchable by window title");
+        Check(!System.Text.Json.JsonSerializer.Serialize(titleFixture).Contains("열린 문서 제목"),"Window title is not persisted in favorites");
+        File.WriteAllText(Path.Combine(output,"running-apps.txt"),"Detected "+running.Count+" open windows; all launch targets validated without launching.");
         var actualCatalog=await Task.Run(()=>LauncherCatalog.Discover());
         var installedChat=actualCatalog.FirstOrDefault(x=>x.Target.Contains("OpenAI.Codex_",StringComparison.OrdinalIgnoreCase));
         if(installedChat!=null){
@@ -82,6 +88,18 @@ internal static class LauncherTests
         {
             await vm.InitializeAsync();
             Check(vm.LauncherFavorites.Count==3,"Load favorites");
+            var originals=vm.LauncherFavorites.ToArray();
+            for(int i=0;i<28;i++)vm.LauncherFavorites.Add(new(){Name="줄바꿈 항목 "+i,Target=exe,Kind="App"});
+            window.Width=1200;window.UpdateLayout();
+            var launcherBar=(Border)window.FindName("LauncherBar");
+            IEnumerable<DependencyObject> Walk(DependencyObject root){
+                for(int i=0;i<VisualTreeHelper.GetChildrenCount(root);i++){var child=VisualTreeHelper.GetChild(root,i);yield return child;foreach(var nested in Walk(child))yield return nested;}
+            }
+            var itemButtons=Walk(launcherBar).OfType<Button>().Where(b=>b.DataContext is LauncherFavorite).ToArray();
+            var positions=itemButtons.Select(b=>b.TranslatePoint(new Point(),launcherBar)).ToArray();
+            Check(positions.Select(p=>Math.Round(p.Y)).Distinct().Count()>1,"Launcher items wrap to multiple rows");
+            Check(itemButtons.All(b=>{var p=b.TranslatePoint(new Point(),launcherBar);return p.X>=0&&p.X+b.ActualWidth<=launcherBar.ActualWidth+1;}),"Wrapped favorites stay within window width");
+            vm.LauncherFavorites.Clear();foreach(var item in originals)vm.LauncherFavorites.Add(item);
             await vm.SwitchWorkspaceAsync(second.Id);
             Check(vm.LauncherFavorites.Count==3 && vm.LauncherFavorites[2].BrowserPath==exe,"Shared across workspaces");
             vm.LauncherFavorites.Move(2,0);Check(vm.Save(),"Save");

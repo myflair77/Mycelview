@@ -19,26 +19,27 @@ public partial class MainWindow
         }
     }
     void PreviewLauncherMotion(Guid target,bool after){
-        var order=launcherSlots.Keys.OrderBy(x=>launcherSlots[x].Left).ToList();
+        var order=launcherSlots.Keys.OrderBy(x=>launcherSlots[x].Top).ThenBy(x=>launcherSlots[x].Left).ToList();
         var moving=order.FirstOrDefault(x=>x.DataContext is LauncherFavorite f&&f.Id==launcherMoving);
         var destination=order.FirstOrDefault(x=>x.DataContext is LauncherFavorite f&&f.Id==target);
         if(moving==null||destination==null||moving==destination)return;
-        double gap=order.Count>1?Math.Max(0,launcherSlots[order[1]].Left-launcherSlots[order[0]].Right):4;
-        double x=launcherSlots[order[0]].Left;
+        var panel=FileContextMenus.Parent<WrapPanel>(moving);
+        var origin=panel?.TranslatePoint(new Point(),WindowLayers)??new Point(launcherSlots.Values.Min(r=>r.Left),launcherSlots.Values.Min(r=>r.Top));
+        double available=panel?.ActualWidth??launcherSlots.Values.Max(r=>r.Right)-origin.X;
+        double x=origin.X,y=origin.Y,rowHeight=0;
         order.Remove(moving);order.Insert(order.IndexOf(destination)+(after?1:0),moving);
-        foreach(var element in order){
-            double delta=x-launcherSlots[element].Left;
-            if(element!=moving){
-                var old=element.RenderTransform as TranslateTransform;
-                if(old==null||Math.Abs(old.X-delta)>0.5){
-                    var transform=new TranslateTransform(old?.X??0,0);element.RenderTransform=transform;
-                    transform.BeginAnimation(TranslateTransform.XProperty,new System.Windows.Media.Animation.DoubleAnimation(delta,TimeSpan.FromMilliseconds(160)));
-                }
-            }
-            x+=launcherSlots[element].Width+gap;
+        for(int i=0;i<order.Count;i++){
+            var element=order[i];var bounds=launcherSlots[element];
+            if(x>origin.X&&x+bounds.Width>origin.X+available){x=origin.X;y+=rowHeight;rowHeight=0;}
+            double dx=x-bounds.Left,dy=y-bounds.Top;x+=bounds.Width+element.Margin.Left+element.Margin.Right;rowHeight=Math.Max(rowHeight,bounds.Height+element.Margin.Top+element.Margin.Bottom);
+            if(element==moving)continue;
+            var old=element.RenderTransform as TranslateTransform;
+            var transform=new TranslateTransform(old?.X??0,old?.Y??0);element.RenderTransform=transform;
+            var duration=TimeSpan.FromMilliseconds(160);
+            transform.BeginAnimation(TranslateTransform.XProperty,new System.Windows.Media.Animation.DoubleAnimation(dx,duration));
+            transform.BeginAnimation(TranslateTransform.YProperty,new System.Windows.Media.Animation.DoubleAnimation(dy,duration));
         }
-    }
-    void ResetLauncherMotion(){foreach(var element in launcherSlots.Keys)element.RenderTransform=Transform.Identity;launcherSlots.Clear();launcherMoving=null;}
+    }    void ResetLauncherMotion(){foreach(var element in launcherSlots.Keys)element.RenderTransform=Transform.Identity;launcherSlots.Clear();launcherMoving=null;}
     Point launcherPress;
     FrameworkElement? launcherSource;
     bool launcherDragging;
@@ -100,7 +101,7 @@ public partial class MainWindow
         if(moving==null||moving.Kind!=group.Kind)return default;
         if(launcherSlots.Count>0){
             var pointer=e.GetPosition(WindowLayers);
-            var candidate=launcherSlots.FirstOrDefault(pair=>pointer.X>=pair.Value.Left&&pointer.X<=pair.Value.Right);
+            var candidate=launcherSlots.FirstOrDefault(pair=>pair.Value.Contains(pointer));
             if(candidate.Key?.DataContext is LauncherFavorite favorite)return(candidate.Key,group.Kind,favorite,pointer.X>=candidate.Value.Left+candidate.Value.Width/2);
         }
         if(itemElement?.DataContext is LauncherFavorite item)return(itemElement,group.Kind,item,e.GetPosition(itemElement).X>=itemElement.ActualWidth/2);

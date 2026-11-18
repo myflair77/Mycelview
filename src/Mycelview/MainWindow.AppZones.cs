@@ -83,13 +83,17 @@ public partial class MainWindow
             windowTarget.SelectionChanged+=(_,_)=>{if(!loadingWindows&&windowTarget.SelectedItem is BrowserChoice selected)z.WindowAppPath=selected.Path;};
             app.SelectionChanged+=(_,_)=>LoadWindows();
             LoadWindows();
+            panel.Children.Add(new TextBlock{Text="호출 방식",Margin=new Thickness(0,4,0,0)});
+            var switchMode=new ComboBox{ItemsSource=new[]{"마우스로 전환","클릭으로 전환"},SelectedIndex=z.SwitchMode=="Mouse"?0:1,Margin=new Thickness(0,4,0,8),ToolTip="마우스로 전환: 카드 위에 마우스를 올리면 해당 창이 앞으로 옵니다. 클릭하면 미리보기를 닫습니다. 창이 하나면 바로 전환합니다."};
+            panel.Children.Add(switchMode);switchMode.SelectionChanged+=(_,_)=>z.SwitchMode=switchMode.SelectedIndex==0?"Mouse":"Click";
             string[] edges=["Left","Right","Top","Bottom"];
             var edge=new ComboBox{ItemsSource=new[]{"왼쪽 경계","오른쪽 경계","위쪽 경계","아래쪽 경계"},SelectedIndex=Math.Max(0,Array.IndexOf(edges,z.Edge))};
             var monitor=new ComboBox{DisplayMemberPath="Value",SelectedValuePath="Key",Margin=new Thickness(0,5,0,5)};panel.Children.Add(monitor);panel.Children.Add(edge);
             void Monitors(){
-                var entries=new List<KeyValuePair<string,string>>{new("Automatic","가장 "+new[]{"왼쪽","오른쪽","위쪽","아래쪽"}[edge.SelectedIndex]+" 모니터 (자동)")};
-                entries.AddRange(EdgeActivationService.GetMonitors().Select(m=>new KeyValuePair<string,string>(m.Device,m.Label)));
-                if(!entries.Any(x=>x.Key==z.Monitor))entries.Add(new(z.Monitor,z.Monitor+" (연결되지 않음)"));
+                var physical=EdgeActivationService.GetMonitors();
+                var entries=physical.Select(m=>new KeyValuePair<string,string>(m.Device,m.Label)).ToList();
+                if(!entries.Any(x=>x.Key==z.Monitor))
+                    z.Monitor=EdgeActivationService.SelectMonitor(physical,z.Monitor,z.Edge)?.Device??entries.FirstOrDefault().Key??"";
                 monitor.ItemsSource=entries;monitor.SelectedValue=z.Monitor;
             }
             edge.SelectionChanged+=(_,_)=>{z.Edge=edges[edge.SelectedIndex];Monitors();};Monitors();

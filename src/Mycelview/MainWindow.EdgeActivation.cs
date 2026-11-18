@@ -11,6 +11,7 @@ public partial class MainWindow
     internal Window CreateEdgeActivationDialog(LauncherFavorite? favorite = null)
     {
         var saved = ViewModel.EdgeActivation.Normalize();
+        var switchMode=new ComboBox{ItemsSource=new[]{"마우스로 전환","클릭으로 전환"},SelectedIndex=saved.SwitchMode=="Click"?1:0,Margin=new Thickness(0,4,0,10)};
         if(favorite != null) LauncherEdgeSetup.Prepare(saved,favorite);
         var dialog = new Window { Owner = this, Icon = Icon, Title = "엣지콜(edgecall) 설정", Width = 540, Height = Math.Min(820, SystemParameters.WorkArea.Height - 40), MinHeight = 400, MinWidth = 500, SizeToContent = SizeToContent.Manual, ResizeMode = ResizeMode.CanResize, WindowStartupLocation = WindowStartupLocation.CenterOwner };
         dialog.SetResourceReference(BackgroundProperty, "SurfaceBrush"); dialog.SetResourceReference(ForegroundProperty, "TextBrush");
@@ -130,7 +131,7 @@ public partial class MainWindow
             int end = rangeMode.SelectedIndex == 0 ? 100 : (int)Math.Round(rangeEnd.Value);
             if (!ValidateAppZones(appZones, out var zoneError)) { error.Text=zoneError; return; }
             var previous = ViewModel.EdgeActivation;
-            ViewModel.EdgeActivation = new() { AppZones = appZones, Enabled = enabled.IsChecked == true, Edge = edges[Math.Max(0, edge.SelectedIndex)], DelayMs = delayMs, ThicknessPixels = thicknessPixels, OpacityPercent = opacity.Value, StartPercent = start, EndPercent = end, Monitor = (string?)monitor.SelectedValue ?? "Automatic" };
+            ViewModel.EdgeActivation = new() { SwitchMode = switchMode.SelectedIndex==0?"Mouse":"Click", AppZones = appZones, Enabled = enabled.IsChecked == true, Edge = edges[Math.Max(0, edge.SelectedIndex)], DelayMs = delayMs, ThicknessPixels = thicknessPixels, OpacityPercent = opacity.Value, StartPercent = start, EndPercent = end, Monitor = (string?)monitor.SelectedValue ?? "Automatic" };
             if (!ViewModel.Save()) { ViewModel.EdgeActivation = previous; error.Text = "설정을 저장하지 못했습니다. 다시 시도하세요."; return; }
             dialog.DialogResult = true;
         };
@@ -139,6 +140,7 @@ public partial class MainWindow
         panel.Children.Clear();
         var basic=new StackPanel();
         foreach(var child in children.Skip(1).Take(commonStart-1).Concat(children.Skip(monitorStart).Take(helpStart-monitorStart)))basic.Children.Add(child);
+        basic.Children.Add(new TextBlock{Text="호출 방식",Margin=new Thickness(0,10,0,0)});basic.Children.Add(switchMode);
         basic.Children.Remove(preview);
         basic.Children.Insert(0,ScreenEdgePicker.Create(()=>new EdgeActivationSettings{Edge=edges[edge.SelectedIndex],Monitor=(string?)monitor.SelectedValue??"Automatic",StartPercent=rangeMode.SelectedIndex==0?0:(int)rangeStart.Value,EndPercent=rangeMode.SelectedIndex==0?100:(int)rangeEnd.Value},(device,side,a,b)=>{
             edge.SelectedIndex=Array.IndexOf(edges,side);monitor.SelectedValue=device;rangeMode.SelectedIndex=1;
@@ -150,7 +152,17 @@ public partial class MainWindow
         foreach(var child in children.Skip(appStart).Take(appEnd-appStart))apps.Children.Add(child);
         var tabs=new TabControl{Margin=new Thickness(0,12,0,0)};
         void Tab(string title,StackPanel content,string hint){
-            tabs.Items.Add(new TabItem{Header=title,ToolTip=hint,Content=new ScrollViewer{Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,Padding=new Thickness(12,6,12,10)}});
+            var label=new TextBlock{Text=title,FontWeight=FontWeights.SemiBold};
+            var header=new Border{Child=label,CornerRadius=new CornerRadius(5),BorderThickness=new Thickness(1),Padding=new Thickness(10,9,10,9),Margin=new Thickness(2,2,2,4)};
+            var item=new TabItem{Header=header,ToolTip=hint,Padding=new Thickness(0),Content=new ScrollViewer{Content=content,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,Padding=new Thickness(12,12,12,10)}};
+            System.Windows.Automation.AutomationProperties.SetName(item,title);
+            void UpdateHeader(){
+                header.Background=item.IsSelected?System.Windows.Media.Brushes.DodgerBlue:System.Windows.Media.Brushes.WhiteSmoke;
+                header.BorderBrush=item.IsSelected?System.Windows.Media.Brushes.DodgerBlue:System.Windows.Media.Brushes.LightGray;
+                label.Foreground=item.IsSelected?System.Windows.Media.Brushes.White:System.Windows.Media.Brushes.DarkSlateGray;
+            }
+            tabs.SelectionChanged+=(_,_)=>UpdateHeader();
+            tabs.Items.Add(item);UpdateHeader();
         }
         Tab("Mycelview 호출",basic,"화면 가장자리에서 Mycelview 창을 앞으로 가져올 위치를 지정합니다.");
         Tab("브라우저·사이트·앱별 선택",apps,"앱마다 반응 구간을 지정하고 열린 창의 미리보기에서 전환합니다. 한 창의 탭은 하나로 취급합니다.");

@@ -11,6 +11,13 @@ public partial class App : Application
         TextScale.Apply(100);
         TransientPopupTracking.Initialize();
         SkinManager.Apply(SkinManager.DefaultId);
+        if(e.Args.Length>=2&&e.Args[0]=="--test-browser-tabs"){
+            ShutdownMode=ShutdownMode.OnExplicitShutdown;
+            var output=Path.GetFullPath(e.Args[1]);Directory.CreateDirectory(output);
+            try{await BrowserTabsTests.Run(output);Shutdown(0);}
+            catch(Exception error){File.WriteAllText(Path.Combine(output,"failure.txt"),error.ToString());Shutdown(1);}
+            return;
+        }
         if (e.Args.Length >= 2 && e.Args[0] == "--test-app-zones")
         {
             ShutdownMode=ShutdownMode.OnExplicitShutdown;

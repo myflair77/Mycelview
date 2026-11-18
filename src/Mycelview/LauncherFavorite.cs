@@ -13,6 +13,7 @@ public sealed class LauncherFavorite
     public string Kind { get; set; } = "App";
     public string Target { get; set; } = "";
     public string BrowserPath { get; set; } = "";
+    [JsonIgnore] public string CatalogHint { get; set; } = "";
     [JsonIgnore] public string Description => Kind == "Website" ? Target + "\n브라우저: " + (BrowserPath.Length == 0 ? "시스템 기본" : BrowserPath) : Target;
     [JsonIgnore] public ImageSource Icon => ShellIcons.ForPath(Kind == "Website" ? "website.html" : PackagedApps.Executable(Target), false);
     public LauncherFavorite Copy() => new() { Id=Id, Name=Name, Kind=Kind, Target=Target, BrowserPath=BrowserPath };

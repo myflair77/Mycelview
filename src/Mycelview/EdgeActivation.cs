@@ -6,6 +6,7 @@ namespace Mycelview;
 public sealed class EdgeActivationSettings
 {
     public List<AppWindowZone> AppZones { get; set; } = [];
+    public string SwitchMode { get; set; } = "Mouse";
     public bool Enabled { get; set; } = true;
     public string Edge { get; set; } = "Left";
     public int DelayMs { get; set; } = 100;
@@ -18,7 +19,7 @@ public sealed class EdgeActivationSettings
     public int StartPercent { get; set; } = 50;
     public int EndPercent { get; set; } = 100;
     public string Monitor { get; set; } = "Automatic";
-    public EdgeActivationSettings Normalize() => new() { AppZones = (AppZones ?? []).Where(z => z != null && !string.IsNullOrWhiteSpace(z.AppPath)).Select(z => z.Normalized()).ToList(), Enabled = Enabled, OpacityPercent = double.IsFinite(OpacityPercent) ? Math.Clamp(OpacityPercent,0,100) : DefaultOpacityPercent, ThicknessPixels = Math.Clamp(ThicknessPixels, 2, 30), StartPercent = Math.Clamp(StartPercent, 0, 99), EndPercent = Math.Clamp(EndPercent, Math.Clamp(StartPercent, 0, 99) + 1, 100), Edge = Edge is "Right" or "Top" or "Bottom" ? Edge : "Left", DelayMs = Math.Clamp(DelayMs, 100, 5000), Monitor = string.IsNullOrWhiteSpace(Monitor) || Monitor is "Leftmost" or "Rightmost" or "Topmost" or "Bottommost" ? "Automatic" : Monitor };
+    public EdgeActivationSettings Normalize() => new() { SwitchMode = SwitchMode=="Click"?"Click":"Mouse", AppZones = (AppZones ?? []).Where(z => z != null && !string.IsNullOrWhiteSpace(z.AppPath)).Select(z => z.Normalized()).ToList(), Enabled = Enabled, OpacityPercent = double.IsFinite(OpacityPercent) ? Math.Clamp(OpacityPercent,0,100) : DefaultOpacityPercent, ThicknessPixels = Math.Clamp(ThicknessPixels, 2, 30), StartPercent = Math.Clamp(StartPercent, 0, 99), EndPercent = Math.Clamp(EndPercent, Math.Clamp(StartPercent, 0, 99) + 1, 100), Edge = Edge is "Right" or "Top" or "Bottom" ? Edge : "Left", DelayMs = Math.Clamp(DelayMs, 100, 5000), Monitor = string.IsNullOrWhiteSpace(Monitor) || Monitor is "Leftmost" or "Rightmost" or "Topmost" or "Bottommost" ? "Automatic" : Monitor };
 }
 internal sealed record EdgeMonitor(string Device, int Left, int Top, int Right, int Bottom, bool Primary)
 {
@@ -97,7 +98,7 @@ internal sealed class EdgeActivationService : IDisposable
         if (!window.IsEnabled || GetAsyncKeyState(1) < 0 || GetAsyncKeyState(2) < 0) { dwell.Reset(); return; }
         if (AppEdgeSwitcher.Matches(s, monitors, out _)) { dwell.Reset(); return; }
         string? zone = monitor != null && GetCursorPos(out var point) && InRange(monitor, s, point.X, point.Y) ? monitor.Device + s.Edge : null;
-        if (dwell.Update(zone, now, s.DelayMs) && !window.IsActive) Reveal();
+        if (dwell.Update(zone, now, s.DelayMs) && s.SwitchMode!="Click" && !window.IsActive) Reveal();
     }
     internal static List<(int Start,int End)> VisibleMarkerRanges(EdgeActivationSettings settings,List<EdgeMonitor> monitors)
     {
@@ -126,6 +127,18 @@ internal sealed class EdgeActivationService : IDisposable
         finally { if (attached) AttachThreadInput(current, foreground, false); }
     }
     public void Dispose() { timer.Stop(); timer.Tick -= Tick; marker.Dispose(); foreach(var extra in additionalMarkers)extra.Dispose();additionalMarkers.Clear(); }
+    internal static EdgeMonitor WorkArea(EdgeMonitor monitor)
+    {
+        var result=monitor;
+        MonitorCallback callback=(IntPtr handle,IntPtr dc,ref NativeRect rect,IntPtr data)=>{
+            var info=new MonitorInfo{Size=Marshal.SizeOf<MonitorInfo>(),Device=""};
+            if(GetMonitorInfo(handle,ref info)&&info.Device==monitor.Device)
+                result=monitor with{Left=info.Work.Left,Top=info.Work.Top,Right=info.Work.Right,Bottom=info.Work.Bottom};
+            return true;
+        };
+        EnumDisplayMonitors(IntPtr.Zero,IntPtr.Zero,callback,IntPtr.Zero);
+        return result;
+    }
     internal static List<EdgeMonitor> GetMonitors()
     {
         var result = new List<EdgeMonitor>();

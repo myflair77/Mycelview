@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 using System.Windows.Threading;
@@ -36,6 +36,21 @@ public sealed class CardViewModel : Observable, IDisposable
     public string Title => State.Title;
     public System.Windows.Media.ImageSource IconImage => ShellIcons.ForPath(State.InitialPath, !State.IsFile);
     public string CurrentPath => State.CurrentPath;
+    public double RegisteredTitleOpacity => string.IsNullOrEmpty(CurrentFolderHeading) ? 1.0 : 0.45;
+    public string CurrentFolderHeading => FolderHeading(State.InitialPath,CurrentPath);
+    internal static string FolderHeading(string registered,string current)
+    {
+        try{
+            string Normalize(string value)=>Path.TrimEndingDirectorySeparator(Path.GetFullPath(value));
+            string Prefix(string value)=>Path.EndsInDirectorySeparator(value)?value:value+Path.DirectorySeparatorChar;
+            var home=Normalize(registered);var shown=Normalize(current);
+            if(StringComparer.OrdinalIgnoreCase.Equals(home,shown))return "";
+            var relation=home.StartsWith(Prefix(shown),StringComparison.OrdinalIgnoreCase)?"<":
+                shown.StartsWith(Prefix(home),StringComparison.OrdinalIgnoreCase)?">":"—";
+            var name=Path.GetFileName(shown);
+            return relation+" "+(string.IsNullOrEmpty(name)?shown:name);
+        }catch(Exception ex) when(ex is ArgumentException or NotSupportedException or PathTooLongException){return "— "+current;}
+    }
     public string Kind => State.IsFile ? "★" : "▣";
     public bool IsFolder => !State.IsFile;
     public bool Expanded => !State.Collapsed;
@@ -77,14 +92,14 @@ public sealed class CardViewModel : Observable, IDisposable
     {
         if (State.IsFile) return;
         if (remember && !StringComparer.OrdinalIgnoreCase.Equals(CurrentPath, path)) { back.Push(CurrentPath); forward.Clear(); }
-        reading?.Cancel(); SelectedPaths.Clear(); ListingUpdating?.Invoke(); Entries.Clear(); State.CurrentPath = path; State.ScrollOffset = 0; Notify(nameof(CurrentPath)); changed(); _ = RefreshAsync();
+        reading?.Cancel(); SelectedPaths.Clear(); ListingUpdating?.Invoke(); Entries.Clear(); State.CurrentPath = path; State.ScrollOffset = 0; Notify(nameof(CurrentPath)); Notify(nameof(CurrentFolderHeading)); Notify(nameof(RegisteredTitleOpacity)); changed(); _ = RefreshAsync();
     }
     public void Reconnect(string path)
     {
         reading?.Cancel(); SelectedPaths.Clear(); ListingUpdating?.Invoke(); Entries.Clear(); State.InitialPath = State.CurrentPath = path;
         State.Title = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar));
         if (State.Title.Length == 0) State.Title = path;
-        back.Clear(); forward.Clear(); Notify(nameof(Title)); Notify(nameof(CurrentPath)); Notify(nameof(IconImage)); changed(); _ = RefreshAsync();
+        back.Clear(); forward.Clear(); Notify(nameof(Title)); Notify(nameof(CurrentPath)); Notify(nameof(CurrentFolderHeading)); Notify(nameof(RegisteredTitleOpacity)); Notify(nameof(IconImage)); changed(); _ = RefreshAsync();
     }
     internal void ApplyRelocation(string oldPath, string newPath)
     {
@@ -93,7 +108,7 @@ public sealed class CardViewModel : Observable, IDisposable
         if (initial == State.InitialPath && current == State.CurrentPath) return;
         if (State.Title == Path.GetFileName(Path.TrimEndingDirectorySeparator(State.InitialPath))) State.Title = Path.GetFileName(initial);
         State.InitialPath = initial; State.CurrentPath = current;
-        back.Clear(); forward.Clear(); Notify(nameof(Title)); Notify(nameof(CurrentPath)); Notify(nameof(IconImage)); changed();
+        back.Clear(); forward.Clear(); Notify(nameof(Title)); Notify(nameof(CurrentPath)); Notify(nameof(CurrentFolderHeading)); Notify(nameof(RegisteredTitleOpacity)); Notify(nameof(IconImage)); changed();
     }
     public void OpenEntry(FileEntry entry) { if (entry.IsDirectory) Navigate(entry.FullPath); else OpenPath(entry.FullPath); }
     public void OpenPath(string path) { try { FileService.Open(path); } catch (Exception e) { Status = "열기 실패: " + e.Message; } }

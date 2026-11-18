@@ -1,21 +1,32 @@
-﻿# Mycelview · 마이셀뷰
+# Mycelview · 마이셀뷰
 
-**Your Files, Your Workspace.** 내 파일과 폴더를 한눈에, 한곳에서.
+**Your Work, Connected.** 파일부터 앱까지, 내 작업을 한곳에서.
 
 Windows 10/11용 .NET 10 WPF 파일 작업공간입니다. 실제 폴더를 카드로 등록하여 동시에 탐색하고, 폴더·파일 등록과 메모를 로컬에 보관합니다.
 
-## 실행
+## 설치 파일 다운로드
+
+[Windows x64 설치 파일 다운로드](https://github.com/myflair77/Mycelview/releases/download/v0.1.0/Mycelview-Setup-0.1.0-win-x64.exe) · [릴리스 안내 및 SHA256](https://github.com/myflair77/Mycelview/releases/tag/v0.1.0)
+
+Windows 10 2004 이상 / Windows 11에서 사용할 수 있습니다. Mycelview·브라우저 연결 프로그램·.NET 실행 환경이 함께 설치됩니다.
+기존 설정과 즐겨찾기는 유지되며, 프로그램 제거 시에도 사용자 데이터를 삭제하지 않습니다.
+현재 설치 파일은 코드 서명되지 않았습니다.
+
+브라우저 창별 탭 미리보기에는 크롬·엣지·웨일마다 확장을 한 번 추가해야 합니다. 설치 마지막 안내를 따르세요.
+자세한 내용은 [브라우저 연결 안내](browser-integration/README.md), [설치 프로그램 빌드·검증](installer/README.md)을 참고하세요.
+
+## 개발 환경에서 실행
 
 이 개발 PC에서는 **`Run-Mycelview.cmd`를 더블클릭**합니다. 프로젝트 내부 `.tools/dotnet` SDK를 사용하므로 시스템 PATH 변경이 필요 없습니다.
 
-다른 PC에서는 .NET 10 SDK(Windows x64)를 설치한 뒤 PowerShell에서 다음을 실행합니다.
+소스에서 빌드하려면 .NET 10 SDK(Windows x64)를 준비한 뒤 PowerShell에서 다음을 실행합니다.
 
 ```powershell
 .\build.ps1
 .\run.ps1
 ```
 
-프로젝트의 `global.json`은 SDK 10.0.403 및 최신 패치를 사용합니다. 실행파일은 `src/Mycelview/bin/Release/net10.0-windows/Mycelview.exe`입니다. 시스템에 Desktop Runtime이 없고 프로젝트 전용 SDK만 있는 PC에서는 반드시 위 실행 스크립트를 사용하세요. 독립 배포 패키지와 설치 프로그램은 아직 없습니다.
+프로젝트의 `global.json`은 SDK 10.0.403 및 최신 패치를 사용합니다. 실행파일은 `src/Mycelview/bin/Release/net10.0-windows/Mycelview.exe`입니다. 시스템에 Desktop Runtime이 없고 프로젝트 전용 SDK만 있는 PC에서는 반드시 위 실행 스크립트를 사용하세요.
 
 ## 현재 구현
 
@@ -39,7 +50,7 @@ Windows 10/11용 .NET 10 WPF 파일 작업공간입니다. 실제 폴더를 카�
 - 저장 시 원자적 파일 교체와 직전 파일 백업, 손상된 설정 감지 시 저장 중지
 - 중복 실행 방지, DPI 인식, 기본 한국어 UI
 
-카드 등록 해제는 원본을 삭제하지 않습니다. 이 버전에는 실제 파일 이동·복사·삭제 기능이 없습니다.
+카드 등록 해제는 원본을 삭제하지 않습니다. 복사·이동·삭제 같은 실제 파일 작업과 즐겨찾기 등록 해제는 별개의 기능입니다.
 
 ## 데이터
 
